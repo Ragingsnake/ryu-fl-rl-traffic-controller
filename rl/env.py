@@ -172,8 +172,9 @@ class NSFNETRoutingEnv(gym.Env):
                 self.max_delay_norm = max(self.max_delay_norm, d)
 
         # --- 4. Define Spaces ---
-        # State: 42 (util) + 42 (predicted util) + 20 (demands) = 104
-        self.observation_space = spaces.Box(low=0.0, high=1.0, shape=(104,), dtype=np.float32)
+        # State: num_edges (util) + num_edges (predicted util) + num_managed (demands)
+        obs_dim = self.num_edges * 2 + self.num_managed
+        self.observation_space = spaces.Box(low=0.0, high=1.0, shape=(obs_dim,), dtype=np.float32)
         # Action: 20 choices of 3 paths
         self.action_space = spaces.MultiDiscrete([self.K] * self.num_managed)
 

@@ -108,9 +108,9 @@ def evaluate_baseline(
             action = env.action_space.sample()
 
         elif baseline_type == "B3":
-            # RL-Only (Reactive): Zero out predicted utils (indices 42 to 83)
+            # RL-Only (Reactive): Zero out predicted utils
             modified_obs = obs.copy()
-            modified_obs[42:84] = 0.0
+            modified_obs[env.num_edges : 2 * env.num_edges] = 0.0
             if model:
                 action, _ = model.predict(modified_obs, deterministic=True)
             else:

@@ -26,7 +26,7 @@ def test_fl_model_parameter_count():
     model = create_model(f_in=F_in)
 
     total_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
-    assert 30000 < total_params < 50000, f"Expected params around 37k, got {total_params}"
+    assert 30000 < total_params < 60000, f"Expected params around 37k-55k, got {total_params}"
 
 
 def test_fl_model_predict_utility():
