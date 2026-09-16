@@ -1,7 +1,12 @@
 import json
 import os
+import sys
 from collections import deque
 from itertools import islice
+from pathlib import Path
+
+# Ensure project root is in sys.path when executed directly
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import gymnasium as gym
 import networkx as nx

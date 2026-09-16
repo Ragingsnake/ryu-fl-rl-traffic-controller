@@ -1,4 +1,5 @@
 import argparse
+import os
 import subprocess
 import sys
 import time
@@ -12,8 +13,12 @@ def run_step(command: list[str], step_name: str) -> None:
     print(f"{'=' * 50}\n")
 
     start_time = time.time()
+    root_dir = str(Path(__file__).resolve().parent.parent)
+    env = os.environ.copy()
+    env["PYTHONPATH"] = root_dir + os.pathsep + env.get("PYTHONPATH", "")
+
     try:
-        subprocess.run(command, check=True)
+        subprocess.run(command, check=True, env=env, cwd=root_dir)
     except subprocess.CalledProcessError as e:
         print(f"\nError: {step_name} failed with exit code {e.returncode}.")
         sys.exit(1)

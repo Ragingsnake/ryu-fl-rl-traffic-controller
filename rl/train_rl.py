@@ -1,6 +1,11 @@
 import argparse
 import os
+import sys
 from collections.abc import Callable
+from pathlib import Path
+
+# Ensure project root is in sys.path when executed directly
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from stable_baselines3 import PPO
 from stable_baselines3.common.env_util import make_vec_env
