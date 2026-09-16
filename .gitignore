@@ -1,0 +1,14 @@
+models/
+results/
+data/generated/
+data/preprocessed/
+__pycache__/
+*.pyc
+*.pyo
+venv/
+.env
+*.egg-info/
+dist/
+build/
+.pytest_cache/
+wandb/

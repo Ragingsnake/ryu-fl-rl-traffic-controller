@@ -1,0 +1,42 @@
+{
+    "nodes": [
+        {"id": 0, "label": "WA", "city": "Seattle, WA", "domain": "A", "population_weight": 4.0},
+        {"id": 1, "label": "CA1", "city": "Palo Alto, CA", "domain": "A", "population_weight": 7.0},
+        {"id": 2, "label": "CA2", "city": "San Diego, CA", "domain": "A", "population_weight": 3.3},
+        {"id": 3, "label": "NE", "city": "Lincoln, NE", "domain": "B", "population_weight": 1.3},
+        {"id": 4, "label": "IL", "city": "Champaign, IL", "domain": "B", "population_weight": 3.0},
+        {"id": 5, "label": "MI", "city": "Ann Arbor, MI", "domain": "B", "population_weight": 4.3},
+        {"id": 6, "label": "GA", "city": "Atlanta, GA", "domain": "C", "population_weight": 6.1},
+        {"id": 7, "label": "TX", "city": "Houston, TX", "domain": "A", "population_weight": 7.1},
+        {"id": 8, "label": "UT", "city": "Salt Lake City, UT", "domain": "A", "population_weight": 1.2},
+        {"id": 9, "label": "CO", "city": "Boulder, CO", "domain": "B", "population_weight": 2.9},
+        {"id": 10, "label": "PA", "city": "Pittsburgh, PA", "domain": "C", "population_weight": 2.3},
+        {"id": 11, "label": "NY", "city": "Ithaca, NY", "domain": "C", "population_weight": 1.0},
+        {"id": 12, "label": "NJ", "city": "Princeton, NJ", "domain": "C", "population_weight": 20.0},
+        {"id": 13, "label": "DC", "city": "College Park, MD", "domain": "C", "population_weight": 6.0}
+    ],
+    "links": [
+        {"source": 0, "target": 1, "capacity_bps": 10000000, "delay_ms": 4},
+        {"source": 0, "target": 2, "capacity_bps": 10000000, "delay_ms": 6},
+        {"source": 0, "target": 7, "capacity_bps": 10000000, "delay_ms": 10},
+        {"source": 1, "target": 2, "capacity_bps": 10000000, "delay_ms": 3},
+        {"source": 1, "target": 3, "capacity_bps": 10000000, "delay_ms": 8},
+        {"source": 2, "target": 5, "capacity_bps": 10000000, "delay_ms": 10},
+        {"source": 3, "target": 4, "capacity_bps": 10000000, "delay_ms": 3},
+        {"source": 3, "target": 8, "capacity_bps": 10000000, "delay_ms": 4},
+        {"source": 4, "target": 5, "capacity_bps": 10000000, "delay_ms": 2},
+        {"source": 4, "target": 6, "capacity_bps": 10000000, "delay_ms": 3},
+        {"source": 5, "target": 10, "capacity_bps": 10000000, "delay_ms": 2},
+        {"source": 5, "target": 13, "capacity_bps": 10000000, "delay_ms": 3},
+        {"source": 6, "target": 7, "capacity_bps": 10000000, "delay_ms": 4},
+        {"source": 7, "target": 9, "capacity_bps": 10000000, "delay_ms": 5},
+        {"source": 8, "target": 9, "capacity_bps": 10000000, "delay_ms": 2},
+        {"source": 8, "target": 11, "capacity_bps": 10000000, "delay_ms": 9},
+        {"source": 8, "target": 12, "capacity_bps": 10000000, "delay_ms": 9},
+        {"source": 9, "target": 10, "capacity_bps": 10000000, "delay_ms": 7},
+        {"source": 10, "target": 11, "capacity_bps": 10000000, "delay_ms": 2},
+        {"source": 10, "target": 12, "capacity_bps": 10000000, "delay_ms": 2},
+        {"source": 11, "target": 13, "capacity_bps": 10000000, "delay_ms": 3},
+        {"source": 12, "target": 13, "capacity_bps": 10000000, "delay_ms": 2}
+    ]
+}
