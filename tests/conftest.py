@@ -4,10 +4,9 @@ Provides topology data, small test TMs, and env instances for testing.
 """
 
 import json
-import os
-import pytest
+
 import numpy as np
-from pathlib import Path
+import pytest
 
 
 # --- Topology fixture ---
@@ -87,4 +86,5 @@ def dummy_env(tmp_test_files):
     """Create a real NSFNETRoutingEnv instance using temporary test data."""
     topo_path, tm_path = tmp_test_files
     from rl.env import NSFNETRoutingEnv
+
     return NSFNETRoutingEnv(topo_path=topo_path, tm_path=tm_path)

@@ -1,24 +1,26 @@
 import argparse
 import subprocess
-import time
 import sys
+import time
 from pathlib import Path
 
+
 def run_step(command: list[str], step_name: str) -> None:
-    print(f"\n{'='*50}")
+    print(f"\n{'=' * 50}")
     print(f"Starting {step_name}...")
     print(f"Command: {' '.join(command)}")
-    print(f"{'='*50}\n")
-    
+    print(f"{'=' * 50}\n")
+
     start_time = time.time()
     try:
         subprocess.run(command, check=True)
     except subprocess.CalledProcessError as e:
         print(f"\nError: {step_name} failed with exit code {e.returncode}.")
         sys.exit(1)
-        
+
     duration = time.time() - start_time
     print(f"\n{step_name} completed in {duration:.2f} seconds.")
+
 
 def main():
     parser = argparse.ArgumentParser(description="End-to-End FL+RL Traffic Engineering Pipeline")
@@ -58,9 +60,10 @@ def main():
     run_step(cmd_benchmark, "Step 5: Run Benchmarks")
 
     total_duration = time.time() - total_start_time
-    print(f"\n{'='*50}")
+    print(f"\n{'=' * 50}")
     print(f"PIPELINE COMPLETED in {total_duration:.2f} seconds.")
-    print(f"{'='*50}\n")
+    print(f"{'=' * 50}\n")
+
 
 if __name__ == "__main__":
     main()

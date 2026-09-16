@@ -11,13 +11,16 @@ Produces plots in results/demo/:
     - mlu_time.png: Maximum Link Utilization over time
 """
 
-import sys
 import os
+import sys
 from pathlib import Path
-import numpy as np
+
 import matplotlib
+import numpy as np
+
 matplotlib.use("Agg")  # Non-interactive backend for servers/CI
 import matplotlib.pyplot as plt
+
 
 def run_demo():
     """Run demo with actual env + model if available, else mock data."""
@@ -29,10 +32,7 @@ def run_demo():
     fl_model_path = "models/fl_global_model.pt"
     rl_model_path = "models/ppo_agent.zip"
 
-    use_real = (
-        os.path.exists(topo_path) and
-        os.path.exists(tm_path)
-    )
+    use_real = os.path.exists(topo_path) and os.path.exists(tm_path)
 
     if use_real:
         print("Using REAL environment and data...")
@@ -51,9 +51,10 @@ def run_demo():
         if os.path.exists(rl_model_path):
             try:
                 from stable_baselines3 import PPO
+
                 agent = PPO.load(rl_model_path)
                 print("Loaded trained RL agent.")
-            except Exception as e:
+            except (RuntimeError, ValueError, OSError) as e:
                 print(f"Could not load RL agent: {e}. Using OSPF baseline.")
 
         # --- Apply T2 scenario: 3x demand on top 3 OD pairs at t=30 for 10 steps ---
@@ -61,7 +62,7 @@ def run_demo():
         start_idx = env.time_index
 
         # Modify TM data for T2 in-place (we'll restore after)
-        original_slice = env.tm_data[start_idx:start_idx + 100].copy()
+        original_slice = env.tm_data[start_idx : start_idx + 100].copy()
         for t in range(30, 40):
             abs_t = start_idx + t
             if abs_t < len(env.tm_data):
@@ -83,7 +84,7 @@ def run_demo():
                 # OSPF baseline: always pick path 0 (shortest)
                 action = np.zeros(env.num_managed, dtype=np.int32)
 
-            obs, reward, done, truncated, info = env.step(action)
+            obs, reward, done, _truncated, info = env.step(action)
             rewards.append(reward)
             mlus.append(info["mlu"])
             mean_utils.append(np.mean(env.link_utils))
@@ -94,7 +95,7 @@ def run_demo():
                 break
 
         # Restore original TM data
-        env.tm_data[start_idx:start_idx + 100] = original_slice
+        env.tm_data[start_idx : start_idx + 100] = original_slice
 
         timesteps = np.arange(len(rewards))
         mean_utilization = np.array(mean_utils)
@@ -158,7 +159,7 @@ def run_demo():
     print(f"\nDemo complete! Plots saved to {results_dir}/")
     print(f"\nSummary Metrics ({agent_label}):")
     print(f"  Average MLU:          {np.mean(mlu):.3f}")
-    print(f"  Max MLU (spike):      {np.max(mlu[30:min(40, len(mlu))]):.3f}")
+    print(f"  Max MLU (spike):      {np.max(mlu[30 : min(40, len(mlu))]):.3f}")
     print(f"  Average Reward:       {np.mean(rewards):.3f}")
     print(f"  Mean Utilization:     {np.mean(mean_utilization):.3f}")
 

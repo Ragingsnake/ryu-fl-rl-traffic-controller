@@ -1,0 +1,19 @@
+[tool.ruff]
+line-length = 120
+target-version = "py310"
+
+[tool.ruff.lint]
+select = [
+    "E",    # pycodestyle errors
+    "W",    # pycodestyle warnings
+    "F",    # pyflakes
+    "I",    # isort
+    "UP",   # pyupgrade
+    "C4",   # flake8-comprehensions
+    "RUF",  # ruff-specific rules
+    "SIM",  # flake8-simplify
+]
+ignore = [
+    "E501",   # line length
+    "RUF012", # mutable class attributes (gym metadata)
+]

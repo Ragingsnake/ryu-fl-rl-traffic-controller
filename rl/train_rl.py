@@ -1,16 +1,21 @@
-import os
 import argparse
+import os
+from collections.abc import Callable
+
 from stable_baselines3 import PPO
 from stable_baselines3.common.env_util import make_vec_env
-from stable_baselines3.common.vec_env import SubprocVecEnv, DummyVecEnv
-from rl.env import NSFNETRoutingEnv
+from stable_baselines3.common.vec_env import DummyVecEnv, SubprocVecEnv
+
 from rl.callbacks import MetricsCallback
-from typing import Callable
+from rl.env import NSFNETRoutingEnv
+
 
 def linear_schedule(initial_value: float, final_value: float = 1e-5) -> Callable[[float], float]:
     def func(progress_remaining: float) -> float:
         return final_value + progress_remaining * (initial_value - final_value)
+
     return func
+
 
 def main():
     parser = argparse.ArgumentParser(description="Train PPO Agent for Traffic Engineering")
@@ -34,15 +39,13 @@ def main():
     # Falling back to DummyVecEnv for broader compatibility if Subproc fails
     try:
         vec_env = make_vec_env(make_env, n_envs=args.n_envs, vec_env_cls=SubprocVecEnv)
-    except Exception as e:
+    except (RuntimeError, ValueError, OSError, TimeoutError) as e:
         print(f"SubprocVecEnv failed: {e}. Falling back to DummyVecEnv.")
         vec_env = make_vec_env(make_env, n_envs=args.n_envs, vec_env_cls=DummyVecEnv)
 
     callback = MetricsCallback(log_dir=args.log_dir, verbose=1)
 
-    policy_kwargs = dict(
-        net_arch=dict(pi=[256, 128], vf=[256, 128])
-    )
+    policy_kwargs = {"net_arch": {"pi": [256, 128], "vf": [256, 128]}}
 
     # Hyperparameters per §5.6
     model = PPO(
@@ -60,15 +63,16 @@ def main():
         max_grad_norm=0.5,
         policy_kwargs=policy_kwargs,
         verbose=1,
-        tensorboard_log=args.log_dir
+        tensorboard_log=args.log_dir,
     )
 
     print(f"Starting training for {args.timesteps} timesteps...")
     model.learn(total_timesteps=args.timesteps, callback=callback, progress_bar=True)
-    
+
     save_path = os.path.join(args.model_dir, "ppo_agent.zip")
     model.save(save_path)
     print(f"Model saved to {save_path}")
+
 
 if __name__ == "__main__":
     main()
