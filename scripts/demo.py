@@ -298,11 +298,13 @@ def run_demo():
 
             ax.set_title(scenario_titles[sc], fontsize=11, fontweight="bold")
             ax.set_ylabel(ylabel, fontsize=10)
+            ax.set_xticks([0, 24, 48, 72, 96, 100])
+            ax.set_xticklabels(["08:00", "10:00", "12:00", "14:00 (Peak)", "16:00", "16:20"], fontsize=8)
             ax.grid(True, linestyle="--", alpha=0.5)
             if idx == 0:
                 ax.legend(loc="upper right", framealpha=0.9)
 
-        axes[-1].set_xlabel("Timestep (5-minute intervals)", fontsize=11)
+        axes[-1].set_xlabel("Time of Day (08:00 AM - 04:20 PM / 5-minute intervals)", fontsize=11)
         plt.tight_layout()
         plt.savefig(results_dir / fname, dpi=200)
         plt.close()
@@ -333,7 +335,9 @@ def run_demo():
         if thresh:
             ax.axhline(0.90, color="red", linestyle=":", label="Threshold (0.90)")
         ax.set_title(f"T4 Flash Crowd: {m_label}", fontsize=11, fontweight="bold")
-        ax.set_xlabel("Timestep (5-minute intervals)")
+        ax.set_xticks([0, 24, 48, 72, 96, 100])
+        ax.set_xticklabels(["08:00", "10:00", "12:00", "14:00 (Peak)", "16:00", "16:20"], fontsize=8)
+        ax.set_xlabel("Time of Day (08:00 AM - 04:20 PM / 5-min intervals)")
         ax.set_ylabel(m_label)
         ax.grid(True, linestyle="--", alpha=0.5)
         ax.legend(loc="upper left", framealpha=0.9, fontsize=9)
@@ -371,7 +375,9 @@ def run_demo():
         if thresh:
             ax.axhline(0.90, color="red", linestyle=":", label="Threshold (0.90)")
         ax.set_title(f"T2 Traffic Spike: {m_label}", fontsize=11, fontweight="bold")
-        ax.set_xlabel("Timestep (5-minute intervals)")
+        ax.set_xticks([0, 24, 48, 72, 96, 100])
+        ax.set_xticklabels(["08:00", "10:00", "12:00", "14:00 (Peak)", "16:00", "16:20"], fontsize=8)
+        ax.set_xlabel("Time of Day (08:00 AM - 04:20 PM / 5-min intervals)")
         ax.set_ylabel(m_label)
         ax.grid(True, linestyle="--", alpha=0.5)
         ax.legend(loc="upper left", framealpha=0.9, fontsize=9)
@@ -409,7 +415,9 @@ def run_demo():
         if thresh:
             ax.axhline(0.90, color="red", linestyle=":", label="Threshold (0.90)")
         ax.set_title(f"T5 Link Failure: {m_label}", fontsize=11, fontweight="bold")
-        ax.set_xlabel("Timestep (5-minute intervals)")
+        ax.set_xticks([0, 24, 48, 72, 96, 100])
+        ax.set_xticklabels(["08:00", "10:00", "12:00", "14:00 (Peak)", "16:00", "16:20"], fontsize=8)
+        ax.set_xlabel("Time of Day (08:00 AM - 04:20 PM / 5-min intervals)")
         ax.set_ylabel(m_label)
         ax.grid(True, linestyle="--", alpha=0.5)
         ax.legend(loc="upper left", framealpha=0.9, fontsize=9)

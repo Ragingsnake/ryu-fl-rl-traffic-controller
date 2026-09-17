@@ -30,9 +30,5 @@ models/*
 !models/ppo_agent.zip
 !models/fl_global_model.pt
 
-# Results: Track demo plots and benchmark CSV tables, ignore temporary runs
-results/*
-!results/demo/
-!results/benchmark_results.csv
-!results/summary_table.csv
-!results/fl_prediction_metrics.csv
+# Results: Generated locally or in CI artifacts, not committed to git
+results/
