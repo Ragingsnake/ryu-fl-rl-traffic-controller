@@ -5,26 +5,33 @@ import sys
 import time
 from pathlib import Path
 
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+if hasattr(sys.stderr, "reconfigure"):
+    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+
 
 def run_step(command: list[str], step_name: str) -> None:
     print(f"\n{'=' * 50}")
     print(f"Starting {step_name}...")
     print(f"Command: {' '.join(command)}")
-    print(f"{'=' * 50}\n")
+    print(f"{'=' * 50}\n", flush=True)
 
     start_time = time.time()
     root_dir = str(Path(__file__).resolve().parent.parent)
     env = os.environ.copy()
     env["PYTHONPATH"] = root_dir + os.pathsep + env.get("PYTHONPATH", "")
+    env["PYTHONIOENCODING"] = "utf-8"
+    env["PYTHONUTF8"] = "1"
 
     try:
         subprocess.run(command, check=True, env=env, cwd=root_dir)
     except subprocess.CalledProcessError as e:
-        print(f"\nError: {step_name} failed with exit code {e.returncode}.")
+        print(f"\nError: {step_name} failed with exit code {e.returncode}.", flush=True)
         sys.exit(1)
 
     duration = time.time() - start_time
-    print(f"\n{step_name} completed in {duration:.2f} seconds.")
+    print(f"\n{step_name} completed in {duration:.2f} seconds.\n", flush=True)
 
 
 def main():

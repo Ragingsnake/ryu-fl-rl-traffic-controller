@@ -1,15 +1,37 @@
-models/
-results/
-data/generated/
-data/preprocessed/
+# Byte-compiled / optimized / DLL files
 __pycache__/
-*.pyc
-*.pyo
+*.py[cod]
+*$py.class
+
+# Virtual Environment
 venv/
+env/
+.venv/
 .env
-*.egg-info/
-dist/
-build/
+
+# Testing & Logs
 .pytest_cache/
 wandb/
 *.log
+results/logs/
+
+# Build artifacts
+dist/
+build/
+*.egg-info/
+
+# Data generated (heavy synthetic matrices)
+data/generated/
+data/preprocessed/
+
+# Models: Ignore temporary models, but track trained production weights
+models/*
+!models/ppo_agent.zip
+!models/fl_global_model.pt
+
+# Results: Track demo plots and benchmark CSV tables, ignore temporary runs
+results/*
+!results/demo/
+!results/benchmark_results.csv
+!results/summary_table.csv
+!results/fl_prediction_metrics.csv

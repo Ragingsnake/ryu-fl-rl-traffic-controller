@@ -38,7 +38,12 @@ def main():
     fl_model_path = "models/fl_global_model.pt"
 
     def make_env():
-        return NSFNETRoutingEnv(topo_path=topo_path, tm_path=tm_path, fl_model_path=fl_model_path)
+        return NSFNETRoutingEnv(
+            topo_path=topo_path,
+            tm_path=tm_path,
+            fl_model_path=fl_model_path,
+            surge_prob=0.15,
+        )
 
     # Use DummyVecEnv for stability across different OS/environments, or SubprocVecEnv for speed
     # Falling back to DummyVecEnv for broader compatibility if Subproc fails
@@ -52,27 +57,53 @@ def main():
 
     policy_kwargs = {"net_arch": {"pi": [256, 128], "vf": [256, 128]}}
 
-    # Hyperparameters per §5.6
+    try:
+        import tensorboard  # noqa: F401
+
+        tb_log = args.log_dir
+    except ImportError:
+        tb_log = None
+
+    # Hyperparameters tuned for coordination, rapid updates, and low entropy
     model = PPO(
         "MlpPolicy",
         vec_env,
         learning_rate=linear_schedule(3e-4, 1e-5),
-        n_steps=2048,
+        n_steps=256,
         batch_size=64,
         n_epochs=10,
-        gamma=0.99,
+        gamma=0.95,
         gae_lambda=0.95,
         clip_range=0.2,
-        ent_coef=0.01,
+        ent_coef=0.0005,
         vf_coef=0.5,
         max_grad_norm=0.5,
         policy_kwargs=policy_kwargs,
         verbose=1,
-        tensorboard_log=args.log_dir,
+        tensorboard_log=tb_log,
     )
 
+    import torch
+
+    # Warm start: initialize policy head bias to favor Path 0 (OSPF baseline prior)
+    with torch.no_grad():
+        bias = model.policy.action_net.bias
+        num_managed = 20
+        for i in range(num_managed):
+            bias[3 * i] = 2.0  # Path 0 (Shortest Path / OSPF prior)
+            bias[3 * i + 1] = 0.0  # Path 1
+            bias[3 * i + 2] = 0.0  # Path 2
+    print("Initialized policy head with prior bias towards Path 0 (OSPF baseline).")
+
+    try:
+        import tqdm  # noqa: F401
+
+        use_pb = True
+    except ImportError:
+        use_pb = False
+
     print(f"Starting training for {args.timesteps} timesteps...")
-    model.learn(total_timesteps=args.timesteps, callback=callback, progress_bar=True)
+    model.learn(total_timesteps=args.timesteps, callback=callback, progress_bar=use_pb)
 
     save_path = os.path.join(args.model_dir, "ppo_agent.zip")
     model.save(save_path)

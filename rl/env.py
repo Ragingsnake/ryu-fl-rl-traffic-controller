@@ -106,8 +106,9 @@ class NSFNETRoutingEnv(gym.Env):
 
     metadata = {"render_modes": ["console"]}
 
-    def __init__(self, topo_path: str, tm_path: str, fl_model_path: str | None = None):
+    def __init__(self, topo_path: str, tm_path: str, fl_model_path: str | None = None, surge_prob: float = 0.0):
         super().__init__()
+        self.surge_prob = surge_prob
 
         # --- 1. Load Topology ---
         self.topology = nx.DiGraph()
@@ -166,15 +167,14 @@ class NSFNETRoutingEnv(gym.Env):
         # Calculate maximum possible demand for normalization
         self.d_max = np.max(self.tm_data) if np.max(self.tm_data) > 0 else 1.0
 
-        # Calculate theoretical maximum delay for normalization
-        self.max_delay_norm = 0.0
-        for p in self.path_table.values():
-            for path in p:
-                d = 0.0
-                for i in range(len(path) - 1):
-                    e = (path[i], path[i + 1])
-                    d += self.topology[e[0]][e[1]]["delay"] + MAX_QUEUE_DELAY_MS
-                self.max_delay_norm = max(self.max_delay_norm, d)
+        # Calculate realistic delay normalization scale (baseline propagation delay ~10ms -> scale ~30ms)
+        prop_delays = []
+        for u, v in self.managed_od_pairs:
+            p0 = self.path_table[(u, v)][0]
+            d = sum(self.topology[p0[i]][p0[i + 1]]["delay"] for i in range(len(p0) - 1))
+            prop_delays.append(d)
+        self.base_delay = float(np.mean(prop_delays)) if prop_delays else 10.0
+        self.max_delay_norm = max(self.base_delay * 3.0, 30.0)
 
         # --- 4. Define Spaces ---
         # State: num_edges (util) + num_edges (predicted util) + num_managed (demands)
@@ -188,6 +188,7 @@ class NSFNETRoutingEnv(gym.Env):
         self.step_count = 0
         self.link_utils = np.zeros(self.num_edges, dtype=np.float32)
         self.history_buffer = deque(maxlen=LOOKBACK_WINDOW)
+        self.last_action = np.zeros(self.num_managed, dtype=np.int32)
 
         # Load FL model
         self.fl_model = DomainPredictor(fl_model_path) if fl_model_path else None
@@ -240,6 +241,7 @@ class NSFNETRoutingEnv(gym.Env):
         self.step_count = 0
 
         self.link_utils = np.zeros(self.num_edges, dtype=np.float32)
+        self.last_action = np.zeros(self.num_managed, dtype=np.int32)
         for _ in range(LOOKBACK_WINDOW):
             self.history_buffer.append(np.zeros(self.num_edges, dtype=np.float32))
 
@@ -279,7 +281,13 @@ class NSFNETRoutingEnv(gym.Env):
         # a. Advance time index
         self.time_index += 1
         self.step_count += 1
-        current_tm = self.tm_data[self.time_index]
+        current_tm = self.tm_data[self.time_index].copy()
+        if self.surge_prob > 0.0 and self.np_random.random() < self.surge_prob:
+            k_surge = int(self.np_random.integers(1, 4))
+            chosen_indices = self.np_random.choice(self.num_managed, size=k_surge, replace=False)
+            for idx in chosen_indices:
+                u, v = self.managed_od_pairs[idx]
+                current_tm[u, v] *= float(self.np_random.uniform(2.0, 3.5))
 
         # b. Compute link loads
         link_loads = np.zeros(self.num_edges, dtype=np.float32)
@@ -370,14 +378,22 @@ class NSFNETRoutingEnv(gym.Env):
 
         # h. Compute reward
         mlu = np.max(self.link_utils)
-        reward = -(1.0 * mlu + 0.5 * avg_delay_norm + 2.0 * avg_loss)
+        action_churn = float(np.mean(action != self.last_action))
+        self.last_action = action.copy()
+        churn_penalty = 0.1 * action_churn
+        reward = -(1.0 * mlu + 0.5 * avg_delay_norm + 2.0 * avg_loss + churn_penalty)
 
         # i. Check done
         all_congested = np.all(self.link_utils > 0.95)
         done = bool(self.step_count >= EPISODE_LENGTH or all_congested)
         truncated = False
 
-        info = {"mlu": float(mlu), "avg_delay": float(avg_delay), "avg_loss": float(avg_loss)}
+        info = {
+            "mlu": float(mlu),
+            "avg_delay": float(avg_delay),
+            "avg_loss": float(avg_loss),
+            "churn": float(action_churn),
+        }
 
         return obs, float(reward), done, truncated, info
 
