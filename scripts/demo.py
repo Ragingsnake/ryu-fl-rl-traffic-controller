@@ -129,15 +129,19 @@ def run_demo():
         fl_model_path=fl_model_path if os.path.exists(fl_model_path) else None,
     )
 
-    trained_agent = None
-    if os.path.exists(rl_model_path):
-        try:
-            from stable_baselines3 import PPO
+    if not os.path.exists(rl_model_path):
+        raise FileNotFoundError(
+            f"Trained RL agent model file not found at '{rl_model_path}'. "
+            "Please ensure models/ppo_agent.zip exists in the repository before running the evaluation demo."
+        )
 
-            trained_agent = PPO.load(rl_model_path)
-            print(f"Loaded trained RL agent from {rl_model_path}.")
-        except (RuntimeError, ValueError, OSError) as e:
-            print(f"Could not load RL agent: {e}.")
+    try:
+        from stable_baselines3 import PPO
+
+        trained_agent = PPO.load(rl_model_path)
+        print(f"Loaded trained RL agent from {rl_model_path}.")
+    except (RuntimeError, ValueError, OSError) as e:
+        raise RuntimeError(f"Failed to load RL agent from {rl_model_path}: {e}") from e
 
     # Policies
     def policy_ospf(_obs, env):
@@ -146,11 +150,9 @@ def run_demo():
     def policy_random(_obs, env):
         return env.action_space.sample()
 
-    def policy_trained(obs, env):
-        if trained_agent is not None:
-            action, _ = trained_agent.predict(obs, deterministic=True)
-            return action
-        return np.zeros(env.num_managed, dtype=np.int32)
+    def policy_trained(obs, _env):
+        action, _ = trained_agent.predict(obs, deterministic=True)
+        return action
 
     policies = {
         "OSPF": policy_ospf,

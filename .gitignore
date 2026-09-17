@@ -11,6 +11,7 @@ env/
 
 # Testing & Logs
 .pytest_cache/
+.ruff_cache/
 wandb/
 *.log
 results/logs/

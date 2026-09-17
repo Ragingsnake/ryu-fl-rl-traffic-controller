@@ -8,9 +8,14 @@ on:
         required: true
         default: '200000'
         type: string
+      train_fl:
+        description: 'Retrain Federated Learning (FL) model before RL training? (Default: false, uses existing models/fl_global_model.pt)'
+        required: false
+        default: false
+        type: boolean
       fl_rounds:
-        description: 'Number of Federated Learning (FL) rounds'
-        required: true
+        description: 'Number of FL rounds (only used if train_fl is checked)'
+        required: false
         default: '20'
         type: string
 
@@ -43,6 +48,7 @@ jobs:
         python data/preprocess.py
 
     - name: Train Federated Learning (FL) Model
+      if: ${{ inputs.train_fl == true }}
       run: |
         python fl/train_fl.py --rounds ${{ inputs.fl_rounds }}
 
@@ -58,6 +64,6 @@ jobs:
         if git diff --staged --quiet; then
           echo "No model changes detected to commit."
         else
-          git commit -m "chore(models): retrain FL (${{ inputs.fl_rounds }} rds) & RL (${{ inputs.rl_timesteps }} steps) [skip ci]"
+          git commit -m "chore(models): retrain RL (${{ inputs.rl_timesteps }} steps) [skip ci]"
           git push origin main
         fi

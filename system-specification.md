@@ -86,7 +86,7 @@ $$TM_{ij}(t) = TM_{ij}^{base} \cdot \max\left(0, \; 1 + A_{daily} \sin\left(\fra
 ## 4. Federated Learning (FL) Subsystem
 
 ### 4.1 LSTM Architecture (`TrafficLSTM`)
-- **Input Dimension**: $f_{in}$ (dynamically padded to $\text{MAX\_F\_IN} = 24$ for FedAvg cross-client compatibility).
+- **Input Dimension**: $f_{in}$ (dynamically padded to `MAX_F_IN = 24` for FedAvg cross-client compatibility).
 - **Lookback Window**: $W_{in} = 12$ steps (1 hour of historical utilization).
 - **Forecast Horizon**: $H = 3$ steps (15 minutes ahead).
 - **Hidden Dimensions**: 2 LSTM layers with 64 units each, followed by a linear projection head of dimension $H \times f_{in}$.
@@ -194,10 +194,10 @@ The repository uses two GitHub Actions workflows:
 
 ### 8.1 Workflow 1: Model Retraining (`.github/workflows/train.yml`)
 - **Trigger**: Manual dispatch (`workflow_dispatch`).
-- **Inputs**: `rl_timesteps` (default: 200,000; can be set to 2,000,000), `fl_rounds` (default: 20).
-- **Execution**: Runs data generation, FL training, and PPO training, then automatically commits and pushes updated weights to `main`:
-  - [`models/ppo_agent.zip`](file:///C:/Users/NRN9HC/Documents/Test/Đề_cương_KLTN_KietDA_NguyenTBN_MMTT2023_2/prototype/models/ppo_agent.zip)
-  - [`models/fl_global_model.pt`](file:///C:/Users/NRN9HC/Documents/Test/Đề_cương_KLTN_KietDA_NguyenTBN_MMTT2023_2/prototype/models/fl_global_model.pt)
+- **Inputs**:
+  - `rl_timesteps`: Number of PPO training timesteps (default: `200000`; can be set to `2000000`).
+  - `train_fl`: Boolean flag (default: `false`). When `false`, it uses the existing trained `models/fl_global_model.pt` directly, saving time and only retraining the RL agent. When set to `true`, it retrains FL for `fl_rounds` before running RL.
+- **Execution**: Runs PPO training (and optionally FL training), then automatically commits and pushes updated weights to `main`.
 
 ### 8.2 Workflow 2: Automated Testing & Evaluation Demo (`.github/workflows/test.yml`)
 - **Trigger**: Runs on every `push` and `pull_request` to `main`.
@@ -217,7 +217,7 @@ The repository uses two GitHub Actions workflows:
 | **PPO Policy Prior** | Random orthogonal init | **Warm-Start (+2.0 bias on Path 0)** | Avoids random exploration chaos across $3.5$ billion combinations; grounds agent in OSPF stability. |
 | **Route Churn Penalty** | None | **$-0.1 \cdot \text{churn}_t$** | Eliminates 66% step-by-step path flapping, dropping route churn to $0.2\%$. |
 | **Delay Normalization** | $D_{max} = 240\text{ ms}$ | **$D_{max} = 30.0\text{ ms}$** | Calibrated to $3\times$ propagation delay so delay differences produce meaningful gradient signal. |
-| **FL Feature Padding** | Theoretical linear projection | **Dynamic $\text{MAX\_F\_IN} = 24$ padding** | Ensures client tensors have identical architecture for standard Flower FedAvg aggregation. |
+| **FL Feature Padding** | Theoretical linear projection | **Dynamic `MAX_F_IN = 24` padding** | Ensures client tensors have identical architecture for standard Flower FedAvg aggregation. |
 | **Scenario T5 Link Failure** | Link (4, 5) | **Backbone Link (8, 12)** | Link 4-5 carried 0 managed flows. Link 8-12 is the primary transcontinental corridor; its failure demonstrates a true $35.7\% \to 24.9\%$ loss reduction. |
 | **Evaluation Timing** | Unanchored random window | **Daytime Peak Window (08:00 AM – 04:20 PM)** | Evaluates active traffic ($65\%–80\%$ load) rather than collapsing into empty midnight troughs. |
 | **CI Automation** | Single monolithic CI | **Two workflows (`train.yml` & `test.yml`)** | Decouples long training runs from fast PR testing and artifact generation. |
