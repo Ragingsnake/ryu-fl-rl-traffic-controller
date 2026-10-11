@@ -5,15 +5,25 @@ import flwr as fl
 import numpy as np
 import torch
 
-from fl.model import create_model
+from model import create_model
+
+def get_initial_parameters(f_in: int = 182) -> fl.common.Parameters:
+    model = create_model(f_in=f_in)
+
+    ndarrays = [
+        tensor.detach().cpu().numpy()
+        for tensor in model.state_dict().values()
+    ]
+
+    return fl.common.ndarrays_to_parameters(ndarrays)
 
 
-class SaveModelStrategy(fl.server.strategy.FedAvg):
+class SaveModelStrategy(fl.server.strategy.FedAdam):
     """
-    Custom FedAvg strategy to save the global model after training.
+    Custom FedAdam strategy to save the global model after training.
     """
 
-    def __init__(self, model_save_path: str, f_in: int = 7, *args, **kwargs):
+    def __init__(self, model_save_path: str, f_in: int = 182, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.model_save_path = model_save_path
         self.f_in = f_in
@@ -25,7 +35,7 @@ class SaveModelStrategy(fl.server.strategy.FedAvg):
         failures: list[tuple[fl.server.client_proxy.ClientProxy, fl.common.FitRes] | BaseException],
     ) -> tuple[fl.common.Parameters | None, dict[str, fl.common.Scalar]]:
 
-        # Call aggregate_fit from base class (FedAvg) to aggregate parameters and metrics
+        # Call aggregate_fit from base class (FedAdam) to aggregate parameters and metrics
         aggregated_parameters, aggregated_metrics = super().aggregate_fit(server_round, results, failures)
 
         if aggregated_parameters is not None:
@@ -56,10 +66,10 @@ class SaveModelStrategy(fl.server.strategy.FedAvg):
 
 
 def build_strategy(
-    num_rounds: int, num_clients: int = 3, model_save_path: str = "models/fl_global_model.pt", f_in: int = 7
+    num_rounds: int, num_clients: int = 3, model_save_path: str = "models/fl_global_model.pt", f_in: int = 182
 ) -> fl.server.strategy.Strategy:
     """
-    Builds the FedAvg strategy for FL training.
+    Builds the FedAdam strategy for FL training.
     """
 
     def fit_config(server_round: int):
@@ -68,6 +78,16 @@ def build_strategy(
     strategy = SaveModelStrategy(
         model_save_path=model_save_path,
         f_in=f_in,
+        
+        initial_parameters=get_initial_parameters(f_in),
+
+        # FedAdam
+        eta=0.001,
+        eta_l=0.001,
+        beta_1=0.9,
+        beta_2=0.99,
+        tau=1e-9,
+
         fraction_fit=1.0,
         fraction_evaluate=1.0,
         min_fit_clients=num_clients,
@@ -76,3 +96,18 @@ def build_strategy(
         on_fit_config_fn=fit_config,
     )
     return strategy
+
+
+# if __name__ == "__main__":
+#     strategy = build_strategy(
+#         num_rounds=20,
+#         num_clients=3,
+#         model_save_path="models/fl_global_model.pt",
+#         f_in=182,
+#     )
+
+#     fl.server.start_server(
+#         server_address="127.0.0.1:8080",
+#         config=fl.server.ServerConfig(num_rounds=20),
+#         strategy=strategy,
+#     )

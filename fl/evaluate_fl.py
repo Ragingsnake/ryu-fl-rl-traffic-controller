@@ -11,111 +11,390 @@ import torch
 from fl.model import create_model, predict
 
 
+# ============================================================
+# COMPUTE METRICS
+# ============================================================
 def compute_metrics(y_true, y_pred):
-    # Shape: (N, H, F_in) -> reshape to (N*H, F_in)
+    """
+    Input:
+        y_true: (N, H, F_in)
+        y_pred: (N, H, F_in)
+
+    Output:
+        mae, rmse, mape, r2
+        Each has shape: (F_in,)
+    """
+
+    # Reshape:
+    # (N, H, F_in) -> (N*H, F_in)
     y_true_flat = y_true.reshape(-1, y_true.shape[-1])
     y_pred_flat = y_pred.reshape(-1, y_pred.shape[-1])
 
-    mae = np.mean(np.abs(y_true_flat - y_pred_flat), axis=0)
-    rmse = np.sqrt(np.mean((y_true_flat - y_pred_flat) ** 2, axis=0))
-    mape = np.mean(np.abs(y_true_flat - y_pred_flat) / (np.abs(y_true_flat) + 1e-6), axis=0) * 100
+    # MAE
+    mae = np.mean(
+        np.abs(y_true_flat - y_pred_flat),
+        axis=0
+    )
 
-    # R2 score manually
+    # RMSE
+    rmse = np.sqrt(
+        np.mean(
+            (y_true_flat - y_pred_flat) ** 2,
+            axis=0
+        )
+    )
+
+    # MAPE
+    mape = np.mean(
+        np.abs(y_true_flat - y_pred_flat)
+        / (np.abs(y_true_flat) + 1e-6),
+        axis=0
+    ) * 100
+
+    # R2
     r2 = []
+
     for i in range(y_true_flat.shape[1]):
-        ss_res = np.sum((y_true_flat[:, i] - y_pred_flat[:, i]) ** 2)
-        ss_tot = np.sum((y_true_flat[:, i] - np.mean(y_true_flat[:, i])) ** 2)
-        r2_val = 1 - (ss_res / (ss_tot + 1e-10))
+
+        ss_res = np.sum(
+            (y_true_flat[:, i] - y_pred_flat[:, i]) ** 2
+        )
+
+        ss_tot = np.sum(
+            (y_true_flat[:, i] - np.mean(y_true_flat[:, i])) ** 2
+        )
+
+        r2_val = 1 - (
+            ss_res / (ss_tot + 1e-10)
+        )
+
         r2.append(r2_val)
+
     r2 = np.array(r2)
 
     return mae, rmse, mape, r2
 
 
+# ============================================================
+# MAIN
+# ============================================================
 def main():
-    print("Starting FL Prediction Evaluation...")
-    base_path = Path(__file__).parent.parent
+
+    print("=" * 60)
+    print("FL GLOBAL MODEL - NSFNET EVALUATION")
+    print("=" * 60)
+
+    # --------------------------------------------------------
+    # Paths
+    # --------------------------------------------------------
+    base_path = Path(__file__).resolve().parent.parent
+
     data_dir = base_path / "data" / "preprocessed"
-    model_path = base_path / "models" / "fl_global_model.pt"
+
+    model_path = (
+        base_path
+        / "models"
+        / "fl_global_model.pt"
+    )
+
     results_dir = base_path / "results"
 
-    results_dir.mkdir(parents=True, exist_ok=True)
+    results_dir.mkdir(
+        parents=True,
+        exist_ok=True
+    )
 
-    global_state_dict = None
-    if model_path.exists():
-        global_state_dict = torch.load(model_path, map_location="cpu")
-    else:
-        print(f"Warning: {model_path} not found. Ensure the FL model is trained.")
+    # --------------------------------------------------------
+    # Check global model
+    # --------------------------------------------------------
+    if not model_path.exists():
+
+        print(
+            f"\nERROR: Global model not found:\n"
+            f"{model_path}"
+        )
+
+        print(
+            "\nPlease train the FL model first."
+        )
+
         return
 
-    MAX_F_IN = 24
-    if global_state_dict is not None and "lstm.weight_ih_l0" in global_state_dict:
-        MAX_F_IN = global_state_dict["lstm.weight_ih_l0"].shape[1]
-    results_list = []
+    print(
+        f"\nLoading global model:\n"
+        f"{model_path}"
+    )
 
-    for domain_id in [0, 1, 2]:
-        test_x_path = data_dir / f"domain_{domain_id}_test_X.npy"
-        test_y_path = data_dir / f"domain_{domain_id}_test_Y.npy"
+    global_state_dict = torch.load(
+        model_path,
+        map_location="cpu"
+    )
 
-        if not test_x_path.exists() or not test_y_path.exists():
-            print(f"Test data for domain {domain_id} not found. Skipping.")
-            continue
+    # --------------------------------------------------------
+    # Load NSFNET test dataset
+    # --------------------------------------------------------
+    test_x_path = (
+        data_dir / "nsfnet_test_X.npy"
+    )
 
-        X_test = np.load(test_x_path)
-        Y_test = np.load(test_y_path)
-        f_in = X_test.shape[-1]
+    test_y_path = (
+        data_dir / "nsfnet_test_Y.npy"
+    )
 
-        # Try to load model with f_in
-        model = create_model(f_in=f_in)
-        padded = False
-        try:
-            model.load_state_dict(global_state_dict)
-        except RuntimeError:
-            # Dimension mismatch, use MAX_F_IN and pad
-            print(f"Shape mismatch for domain {domain_id}. Padding to MAX_F_IN={MAX_F_IN}.")
-            model = create_model(f_in=MAX_F_IN)
-            model.load_state_dict(global_state_dict)
-            padded = True
+    if not test_x_path.exists():
+        print(
+            f"\nERROR: Test X not found:\n"
+            f"{test_x_path}"
+        )
+        return
 
-        model.eval()
+    if not test_y_path.exists():
+        print(
+            f"\nERROR: Test Y not found:\n"
+            f"{test_y_path}"
+        )
+        return
 
-        # Run inference in batches to avoid memory issues if data is large
-        batch_size = 64
-        preds = []
-        with torch.no_grad():
-            for i in range(0, len(X_test), batch_size):
-                batch_x = torch.tensor(X_test[i : i + batch_size], dtype=torch.float32)
-                if padded and batch_x.shape[-1] < MAX_F_IN:
-                    pad_size = MAX_F_IN - batch_x.shape[-1]
-                    batch_x = torch.nn.functional.pad(batch_x, (0, pad_size))
+    print("\nLoading NSFNET test dataset...")
 
-                batch_pred = predict(model, batch_x)
-                if padded and f_in < MAX_F_IN:
-                    batch_pred = batch_pred[:, :, :f_in]
+    X_test = np.load(test_x_path)
+    Y_test = np.load(test_y_path)
 
-                preds.append(batch_pred.numpy())
+    print(
+        f"X_test shape: {X_test.shape}"
+    )
 
-        Y_pred = np.concatenate(preds, axis=0)
+    print(
+        f"Y_test shape: {Y_test.shape}"
+    )
 
-        mae, rmse, mape, r2 = compute_metrics(Y_test, Y_pred)
+    # --------------------------------------------------------
+    # Determine input dimension
+    # --------------------------------------------------------
+    f_in = X_test.shape[-1]
 
-        print(f"\n--- Domain {domain_id} Metrics ---")
-        print(f"Aggregated MAE:  {np.mean(mae):.4f}")
-        print(f"Aggregated RMSE: {np.mean(rmse):.4f}")
-        print(f"Aggregated MAPE: {np.mean(mape):.4f}%")
-        print(f"Aggregated R2:   {np.mean(r2):.4f}")
+    print(
+        f"\nNumber of OD pairs: {f_in}"
+    )
 
-        for i in range(f_in):
-            results_list.append(
-                {"Domain": domain_id, "Link_Idx": i, "MAE": mae[i], "RMSE": rmse[i], "MAPE": mape[i], "R2": r2[i]}
+    if f_in != 182:
+
+        print(
+            f"WARNING: Expected 182 OD pairs, "
+            f"but found {f_in}."
+        )
+
+    # --------------------------------------------------------
+    # Create model
+    # --------------------------------------------------------
+    model = create_model(
+        f_in=f_in
+    )
+
+    # --------------------------------------------------------
+    # Load global FL model
+    # --------------------------------------------------------
+    try:
+
+        model.load_state_dict(
+            global_state_dict
+        )
+
+    except RuntimeError as e:
+
+        print(
+            "\nERROR: Global model architecture "
+            "does not match NSFNET dataset."
+        )
+
+        print("\nDetails:")
+        print(e)
+
+        return
+
+    model.eval()
+
+    print(
+        "\nGlobal model loaded successfully."
+    )
+
+    # --------------------------------------------------------
+    # Prediction
+    # --------------------------------------------------------
+    print(
+        "\nRunning prediction..."
+    )
+
+    batch_size = 64
+
+    predictions = []
+
+    with torch.no_grad():
+
+        for i in range(
+            0,
+            len(X_test),
+            batch_size
+        ):
+
+            batch_x = torch.tensor(
+                X_test[
+                    i:i + batch_size
+                ],
+                dtype=torch.float32
             )
 
-    if results_list:
-        df = pd.DataFrame(results_list)
-        out_csv = results_dir / "fl_prediction_metrics.csv"
-        df.to_csv(out_csv, index=False)
-        print(f"\nResults saved to {out_csv}")
+            batch_pred = predict(
+                model,
+                batch_x
+            )
+
+            predictions.append(
+                batch_pred.numpy()
+            )
+
+    Y_pred = np.concatenate(
+        predictions,
+        axis=0
+    )
+
+    print(
+        f"Y_pred shape: {Y_pred.shape}"
+    )
+
+    # --------------------------------------------------------
+    # Compute metrics
+    # --------------------------------------------------------
+    mae, rmse, mape, r2 = compute_metrics(
+        Y_test,
+        Y_pred
+    )
+
+    # --------------------------------------------------------
+    # Aggregated metrics
+    # --------------------------------------------------------
+    mean_mae = np.mean(mae)
+    mean_rmse = np.mean(rmse)
+    mean_mape = np.mean(mape)
+    mean_r2 = np.mean(r2)
+
+    print("\n" + "=" * 60)
+    print("NSFNET GLOBAL MODEL RESULTS")
+    print("=" * 60)
+
+    print(
+        f"MAE :  {mean_mae:.6f}"
+    )
+
+    print(
+        f"RMSE:  {mean_rmse:.6f}"
+    )
+
+    print(
+        f"MAPE:  {mean_mape:.4f}%"
+    )
+
+    print(
+        f"R2  :  {mean_r2:.6f}"
+    )
+
+    print("=" * 60)
+
+    # --------------------------------------------------------
+    # Per-OD results
+    # --------------------------------------------------------
+    results_list = []
+
+    for i in range(f_in):
+
+        source = (
+            i // 13
+        ) + 1
+
+        destination_index = (
+            i % 13
+        )
+
+        # Because self-pairs are removed:
+        if destination_index >= source:
+            destination = (
+                destination_index + 2
+            )
+        else:
+            destination = (
+                destination_index + 1
+            )
+
+        results_list.append(
+            {
+                "OD_Idx": i + 1,
+                "Source": source,
+                "Destination": destination,
+                "MAE": mae[i],
+                "RMSE": rmse[i],
+                "MAPE": mape[i],
+                "R2": r2[i]
+            }
+        )
+
+    # --------------------------------------------------------
+    # Save results
+    # --------------------------------------------------------
+    df = pd.DataFrame(
+        results_list
+    )
+
+    out_csv = (
+        results_dir
+        / "fl_prediction_metrics.csv"
+    )
+
+    df.to_csv(
+        out_csv,
+        index=False
+    )
+
+    print(
+        f"\nPer-OD results saved to:\n"
+        f"{out_csv}"
+    )
+
+    # --------------------------------------------------------
+    # Save aggregated result
+    # --------------------------------------------------------
+    summary_df = pd.DataFrame(
+        [
+            {
+                "Dataset": "NSFNET",
+                "Num_OD": f_in,
+                "MAE": mean_mae,
+                "RMSE": mean_rmse,
+                "MAPE": mean_mape,
+                "R2": mean_r2
+            }
+        ]
+    )
+
+    summary_csv = (
+        results_dir
+        / "fl_prediction_summary.csv"
+    )
+
+    summary_df.to_csv(
+        summary_csv,
+        index=False
+    )
+
+    print(
+        f"Summary saved to:\n"
+        f"{summary_csv}"
+    )
+
+    print("\nEvaluation completed.")
 
 
+# ============================================================
+# ENTRY POINT
+# ============================================================
 if __name__ == "__main__":
     main()

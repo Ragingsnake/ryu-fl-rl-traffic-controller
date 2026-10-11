@@ -4,6 +4,7 @@ from typing import Any
 
 import flwr as fl
 import numpy as np
+import pandas as pd
 import torch
 from torch import nn, optim
 from torch.utils.data import DataLoader, TensorDataset
@@ -74,49 +75,293 @@ class TrafficClient(fl.client.NumPyClient):
         return float(avg_loss), len(self.val_loader.dataset), {"val_loss": float(avg_loss)}
 
 
+# def load_data(
+#     domain_id: int, data_dir: str = "data/preprocessed", batch_size: int = 32, target_f_in: int | None = None
+# ) -> tuple[DataLoader, DataLoader, int]:
+#     """
+#     Load data for a specific domain ID and return DataLoaders and F_in.
+#     Assumes data is in {data_dir}/domain_{id}_*.npy.
+#     If target_f_in is provided and the local f_in < target_f_in, zero-pad features.
+#     """
+#     x_train_path = os.path.join(data_dir, f"domain_{domain_id}_train_X.npy")
+#     y_train_path = os.path.join(data_dir, f"domain_{domain_id}_train_Y.npy")
+#     x_val_path = os.path.join(data_dir, f"domain_{domain_id}_val_X.npy")
+#     y_val_path = os.path.join(data_dir, f"domain_{domain_id}_val_Y.npy")
+
+#     try:
+#         X_train = np.load(x_train_path)
+#         Y_train = np.load(y_train_path)
+#         X_val = np.load(x_val_path)
+#         Y_val = np.load(y_val_path)
+#     except FileNotFoundError:
+#         print(f"Warning: Data for domain {domain_id} not found at {data_dir}. Using dummy data for testing.")
+#         # Default fallback feature dimension
+#         fallback_dim = target_f_in if target_f_in is not None else 24
+#         X_train = np.random.rand(100, 12, fallback_dim).astype(np.float32)
+#         Y_train = np.random.rand(100, 3, fallback_dim).astype(np.float32)
+#         X_val = np.random.rand(20, 12, fallback_dim).astype(np.float32)
+#         Y_val = np.random.rand(20, 3, fallback_dim).astype(np.float32)
+
+#     F_in = X_train.shape[2]
+
+#     if target_f_in is not None and F_in < target_f_in:
+#         pad_width = target_f_in - F_in
+#         X_train = np.pad(X_train, ((0, 0), (0, 0), (0, pad_width)), mode="constant")
+#         Y_train = np.pad(Y_train, ((0, 0), (0, 0), (0, pad_width)), mode="constant")
+#         X_val = np.pad(X_val, ((0, 0), (0, 0), (0, pad_width)), mode="constant")
+#         Y_val = np.pad(Y_val, ((0, 0), (0, 0), (0, pad_width)), mode="constant")
+#         F_in = target_f_in
+
+#     train_dataset = TensorDataset(
+#         torch.tensor(X_train, dtype=torch.float32), torch.tensor(Y_train, dtype=torch.float32)
+#     )
+#     val_dataset = TensorDataset(torch.tensor(X_val, dtype=torch.float32), torch.tensor(Y_val, dtype=torch.float32))
+
+#     train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
+#     val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
+
+#     return train_loader, val_loader, F_in
+
 def load_data(
-    domain_id: int, data_dir: str = "data/preprocessed", batch_size: int = 32, target_f_in: int | None = None
-) -> tuple[DataLoader, DataLoader, int]:
+    domain_id: int,
+    data_dir: str = "data/preprocessed",
+    batch_size: int = 32,
+    input_len: int = 12,
+    pred_len: int = 3,
+    num_clients: int = 3,
+):
     """
-    Load data for a specific domain ID and return DataLoaders and F_in.
-    Assumes data is in {data_dir}/domain_{id}_*.npy.
-    If target_f_in is provided and the local f_in < target_f_in, zero-pad features.
+    Load preprocessed NSFNET traffic data for one FL client.
+
+    Dataset:
+        NSFNET with 182 directed OD pairs.
+
+    Input:
+        X = [input_len, 182]
+
+    Target:
+        Y = [pred_len, 182]
+
+    Clients:
+        domain_1
+        domain_2
+        domain_3
     """
-    x_train_path = os.path.join(data_dir, f"domain_{domain_id}_train_X.npy")
-    y_train_path = os.path.join(data_dir, f"domain_{domain_id}_train_Y.npy")
-    x_val_path = os.path.join(data_dir, f"domain_{domain_id}_val_X.npy")
-    y_val_path = os.path.join(data_dir, f"domain_{domain_id}_val_Y.npy")
 
-    try:
-        X_train = np.load(x_train_path)
-        Y_train = np.load(y_train_path)
-        X_val = np.load(x_val_path)
-        Y_val = np.load(y_val_path)
-    except FileNotFoundError:
-        print(f"Warning: Data for domain {domain_id} not found at {data_dir}. Using dummy data for testing.")
-        # Default fallback feature dimension
-        fallback_dim = target_f_in if target_f_in is not None else 24
-        X_train = np.random.rand(100, 12, fallback_dim).astype(np.float32)
-        Y_train = np.random.rand(100, 3, fallback_dim).astype(np.float32)
-        X_val = np.random.rand(20, 12, fallback_dim).astype(np.float32)
-        Y_val = np.random.rand(20, 3, fallback_dim).astype(np.float32)
+    # ========================================================
+    # 1. Check client ID
+    # ========================================================
 
-    F_in = X_train.shape[2]
+    if domain_id < 0 or domain_id >= num_clients:
+        raise ValueError(
+            f"domain_id must be in 0..{num_clients - 1}, "
+            f"but received {domain_id}"
+        )
 
-    if target_f_in is not None and F_in < target_f_in:
-        pad_width = target_f_in - F_in
-        X_train = np.pad(X_train, ((0, 0), (0, 0), (0, pad_width)), mode="constant")
-        Y_train = np.pad(Y_train, ((0, 0), (0, 0), (0, pad_width)), mode="constant")
-        X_val = np.pad(X_val, ((0, 0), (0, 0), (0, pad_width)), mode="constant")
-        Y_val = np.pad(Y_val, ((0, 0), (0, 0), (0, pad_width)), mode="constant")
-        F_in = target_f_in
+        # ========================================================
+    # 2. File paths
+    # ========================================================
+
+    file_domain_id = domain_id + 1
+
+    x_train_path = os.path.join(
+        data_dir, f"domain_{file_domain_id}_train_X.npy"
+    )
+    y_train_path = os.path.join(
+        data_dir, f"domain_{file_domain_id}_train_Y.npy"
+    )
+    x_val_path = os.path.join(
+        data_dir, f"domain_{file_domain_id}_val_X.npy"
+    )
+    y_val_path = os.path.join(
+        data_dir, f"domain_{file_domain_id}_val_Y.npy"
+    )
+
+    # ========================================================
+    # 3. Check files
+    # ========================================================
+
+    required_files = [
+        x_train_path,
+        y_train_path,
+        x_val_path,
+        y_val_path,
+    ]
+
+    for path in required_files:
+
+        if not os.path.exists(path):
+            raise FileNotFoundError(
+                f"Không tìm thấy file:\n{path}\n\n"
+                f"Hãy chạy preprocess_nsfnet.py trước."
+            )
+
+    # ========================================================
+    # 4. Load data
+    # ========================================================
+
+    X_train = np.load(x_train_path)
+    Y_train = np.load(y_train_path)
+
+    X_val = np.load(x_val_path)
+    Y_val = np.load(y_val_path)
+
+    # ========================================================
+    # 5. Validate shapes
+    # ========================================================
+
+    expected_features = 182  # Number of directed OD pairs in NSFNET
+
+    if X_train.ndim != 3:
+        raise ValueError(
+            f"X_train phải có 3 chiều "
+            f"(N, input_len, 182), "
+            f"nhưng nhận được {X_train.shape}"
+        )
+
+    if Y_train.ndim != 3:
+        raise ValueError(
+            f"Y_train phải có 3 chiều "
+            f"(N, pred_len, 182), "
+            f"nhưng nhận được {Y_train.shape}"
+        )
+
+    if X_train.shape[-1] != expected_features:
+        raise ValueError(
+            f"X_train phải có {expected_features} OD pairs, "
+            f"nhưng nhận được {X_train.shape[-1]}"
+        )
+
+    if Y_train.shape[-1] != expected_features:
+        raise ValueError(
+            f"Y_train phải có {expected_features} OD pairs, "
+            f"nhưng nhận được {Y_train.shape[-1]}"
+        )
+
+    if X_val.shape[-1] != expected_features:
+        raise ValueError(
+            f"X_val phải có {expected_features} OD pairs, "
+            f"nhưng nhận được {X_val.shape[-1]}"
+        )
+
+    if Y_val.shape[-1] != expected_features:
+        raise ValueError(
+            f"Y_val phải có {expected_features} OD pairs, "
+            f"nhưng nhận được {Y_val.shape[-1]}"
+        )
+
+    # ========================================================
+    # 6. Convert to TensorDataset
+    # ========================================================
 
     train_dataset = TensorDataset(
-        torch.tensor(X_train, dtype=torch.float32), torch.tensor(Y_train, dtype=torch.float32)
+        torch.tensor(
+            X_train,
+            dtype=torch.float32
+        ),
+        torch.tensor(
+            Y_train,
+            dtype=torch.float32
+        )
     )
-    val_dataset = TensorDataset(torch.tensor(X_val, dtype=torch.float32), torch.tensor(Y_val, dtype=torch.float32))
 
-    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
-    val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
+    val_dataset = TensorDataset(
+        torch.tensor(
+            X_val,
+            dtype=torch.float32
+        ),
+        torch.tensor(
+            Y_val,
+            dtype=torch.float32
+        )
+    )
+
+    # ========================================================
+    # 7. DataLoader
+    # ========================================================
+
+    train_loader = DataLoader(
+        train_dataset,
+        batch_size=batch_size,
+        shuffle=True
+    )
+
+    val_loader = DataLoader(
+        val_dataset,
+        batch_size=batch_size,
+        shuffle=False
+    )
+
+    # ========================================================
+    # 8. Feature dimension
+    # ========================================================
+
+    F_in = expected_features
+
+    print(
+        f"Client {domain_id}: "
+        f"train={len(train_dataset)}, "
+        f"val={len(val_dataset)}, "
+        f"X={X_train.shape}, "
+        f"Y={Y_train.shape}, "
+        f"F_in={F_in}"
+    )
 
     return train_loader, val_loader, F_in
+
+
+# def main():
+#     import argparse
+
+#     from model import create_model
+
+#     parser = argparse.ArgumentParser()
+#     parser.add_argument("--domain_id", type=int, required=True)
+#     parser.add_argument(
+#         "--server_address",
+#         type=str,
+#         default="127.0.0.1:8080",
+#     )
+#     parser.add_argument(
+#         "--data_dir",
+#         type=str,
+#         default="data/preprocessed",
+#     )
+#     args = parser.parse_args()
+
+#     print(f"[Client {args.domain_id}] Loading data...", flush=True)
+
+#     train_loader, val_loader, f_in = load_data(
+#         domain_id=args.domain_id,
+#         data_dir=args.data_dir,
+#         batch_size=32,
+#         input_len=12,
+#         pred_len=3,
+#         num_clients=3,
+#     )
+
+#     print(f"[Client {args.domain_id}] Creating model...", flush=True)
+
+#     model = create_model(f_in=f_in)
+
+#     client = TrafficClient(
+#         domain_id=args.domain_id,
+#         model=model,
+#         train_loader=train_loader,
+#         val_loader=val_loader,
+#     )
+
+#     print(
+#         f"[Client {args.domain_id}] Connecting to "
+#         f"{args.server_address}...",
+#         flush=True,
+#     )
+
+#     fl.client.start_client(
+#         server_address=args.server_address,
+#         client=client.to_client(),
+#     )
+
+
+# if __name__ == "__main__":
+#     main()
