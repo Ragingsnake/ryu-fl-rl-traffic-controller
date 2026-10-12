@@ -64,8 +64,8 @@ def main():
     total_start_time = time.time()
 
     # Execute steps
-    run_step(cmd_generate, "Step 1: Generate Traffic Matrices")
-    run_step(cmd_preprocess, "Step 2: Preprocess Data")
+    # run_step(cmd_generate, "Step 1: Generate Traffic Matrices")
+    # run_step(cmd_preprocess, "Step 2: Preprocess Data")
     run_step(cmd_fl, "Step 3: Train FL Model")
     run_step(cmd_eval_fl, "Step 3.5: Evaluate FL Predictions")
     run_step(cmd_rl, "Step 4: Train RL Agent")
