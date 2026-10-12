@@ -29,10 +29,10 @@ The current production system operates on **NSFNET** ($|V|=14, |E|=42$ directed 
 ## 2. Multi-Topology Specifications & Domain Partitions
 
 ### 2.1 NSFNET (Baseline Reference)
-- Nodes: 14, Directed Links: 42 (21 bidirectional).
+- Nodes: 14, Directed Links: 44 (22 bidirectional links in `nsfnet_topology.json`).
 - Domains: 3 (Domain 0: {0,1,2,7,8}; Domain 1: {3,4,5,9}; Domain 2: {6,10,11,12,13}).
 - Managed OD pairs: $N_{\text{OD}} = 20$.
-- State Dimension: $42 \text{ (current)} + 42 \text{ (predicted)} + 20 \text{ (demands)} = 104$.
+- State Dimension: $44 \text{ (current)} + 44 \text{ (predicted)} + 20 \text{ (demands)} = 108$.
 - Maximum Domain Link Feature Width: $\text{MAX\_F\_IN} = 24$.
 
 ### 2.2 GÉANT (Large-Scale European Research Network)
