@@ -55,6 +55,11 @@ def run_episode(env, policy_fn, start_idx: int, seed: int, scenario: str = "T1",
             for k in range(min(5, len(env.managed_od_pairs))):
                 u, v = env.managed_od_pairs[k]
                 scenario_slice[t, u, v] *= 5.0
+    elif scenario == "T6":
+        for t in range(0, 40):
+            scenario_slice[t] *= 2.0
+        for t in range(60, num_steps):
+            scenario_slice[t] *= 0.3
 
     env.tm_data[start_idx : start_idx + num_steps] = scenario_slice
 
@@ -163,13 +168,14 @@ def run_demo():
 
     active_policy_names = list(policies.keys())
 
-    scenarios = ["T1", "T2", "T3", "T4", "T5"]
+    scenarios = ["T1", "T2", "T3", "T4", "T5", "T6"]
     scenario_titles = {
         "T1": "T1: Normal Traffic",
         "T2": "T2: Traffic Spike (3x at t=30..40)",
         "T3": "T3: Gradual Load (+50% over 100 steps)",
         "T4": "T4: Flash Crowd (5x at t=50..55)",
         "T5": "T5: Link Failure (Backbone Link 8-12 down at t=40)",
+        "T6": "T6: Irregular Day (Busy Morning, Quiet Afternoon)",
     }
 
     print(f"\nRunning benchmark across {len(scenarios)} scenarios and {len(args.seeds)} random seeds: {args.seeds}...")
@@ -260,7 +266,7 @@ def run_demo():
     ]
 
     for metric_key, ylabel, fname, has_threshold in metric_configs:
-        _fig, axes = plt.subplots(5, 1, figsize=(12, 14), sharex=True)
+        _fig, axes = plt.subplots(6, 1, figsize=(12, 16), sharex=True)
         for idx, sc in enumerate(scenarios):
             ax = axes[idx]
             timesteps = all_runs[sc]["OSPF"][0]["timesteps"]
@@ -428,6 +434,48 @@ def run_demo():
     plt.tight_layout()
     plt.savefig(results_dir / "scenario_t5_link_failure.png", dpi=200)
     plt.close()
+
+    # 4b. Comprehensive 4-Subplot Deep Dive into Scenario T6 (Irregular Day)
+    _fig, axes = plt.subplots(2, 2, figsize=(14, 10))
+    t6_metrics = [
+        ("mlus", "MLU", axes[0, 0], True),
+        ("avg_losses", "Packet Loss (%)", axes[0, 1], False),
+        ("avg_delays", "End-to-End Delay (ms)", axes[1, 0], False),
+        ("rewards", "Reward", axes[1, 1], False),
+    ]
+
+    timesteps = all_runs["T6"]["OSPF"][0]["timesteps"]
+    for m_key, m_label, ax, thresh in t6_metrics:
+        for p_name in active_policy_names:
+            matrix = np.array([r[m_key] for r in all_runs["T6"][p_name]])
+            mean_c = np.mean(matrix, axis=0)
+            std_c = np.std(matrix, axis=0)
+
+            p_lbl = "OSPF-SPF" if p_name == "OSPF" else ("Random Policy" if p_name == "Random" else "Trained FL+RL")
+            ax.plot(
+                timesteps, mean_c, label=p_lbl, color=colors[p_name], linewidth=widths[p_name], linestyle=styles[p_name]
+            )
+            ax.fill_between(timesteps, mean_c - std_c, mean_c + std_c, color=colors[p_name], alpha=0.15)
+
+        ax.axvspan(0, 40, color="orange", alpha=0.15, label="Busy Morning (2x)")
+        ax.axvspan(60, 100, color="green", alpha=0.15, label="Quiet Afternoon (0.3x)")
+        if thresh:
+            ax.axhline(0.90, color="red", linestyle=":", label="Threshold (0.90)")
+        ax.set_title(f"T6 Irregular Day: {m_label}", fontsize=11, fontweight="bold")
+        ax.set_xticks([0, 24, 48, 72, 96, 100])
+        ax.set_xticklabels(["08:00", "10:00", "12:00", "14:00 (Peak)", "16:00", "16:20"], fontsize=8)
+        ax.set_xlabel("Time of Day (08:00 AM - 04:20 PM / 5-min intervals)")
+        ax.set_ylabel(m_label)
+        ax.grid(True, linestyle="--", alpha=0.5)
+        ax.legend(loc="upper left", framealpha=0.9, fontsize=9)
+
+    plt.suptitle(
+        "Scenario T6 (Irregular Day: Busy Morning, Quiet Afternoon) — Multi-Metric Comparison", fontsize=13, fontweight="bold"
+    )
+    plt.tight_layout()
+    plt.savefig(results_dir / "scenario_t6_irregular_day.png", dpi=200)
+    plt.close()
+
 
     # 5. Summary Grouped Bar Chart Across Scenarios (with Error Bars)
     _fig, axes = plt.subplots(2, 2, figsize=(14, 10))

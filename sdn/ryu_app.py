@@ -21,6 +21,19 @@ class SDNController(simple_switch_13.SimpleSwitch13):
         self.stats = {} 
         self.monitor_thread = hub.spawn(self._monitor)
 
+    @set_ev_cls(ofp_event.EventOFPSwitchFeatures, CONFIG_DISPATCHER)
+    def switch_features_handler(self, ev):
+        super(SDNController, self).switch_features_handler(ev)
+        datapath = ev.msg.datapath
+        self.datapaths[datapath.id] = datapath
+        self.stats.setdefault(datapath.id, {})
+        try:
+            with open('/tmp/sdn_stats.json', 'w') as f:
+                json.dump(self.stats, f)
+        except Exception:
+            pass
+        self.logger.info('Registered datapath %016x via switch features', datapath.id)
+
     @set_ev_cls(ofp_event.EventOFPStateChange, [MAIN_DISPATCHER, DEAD_DISPATCHER])
     def _state_change_handler(self, ev):
         datapath = ev.datapath
@@ -35,8 +48,14 @@ class SDNController(simple_switch_13.SimpleSwitch13):
 
     def _monitor(self):
         while True:
-            for dp in self.datapaths.values():
+            for dp in list(self.datapaths.values()):
                 self._request_stats(dp)
+            if self.stats or self.datapaths:
+                try:
+                    with open('/tmp/sdn_stats.json', 'w') as f:
+                        json.dump(self.stats, f)
+                except Exception:
+                    pass
             hub.sleep(5) # Poll every 5 seconds
 
     def _request_stats(self, datapath):

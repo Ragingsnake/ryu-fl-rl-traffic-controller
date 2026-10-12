@@ -1,3 +1,4 @@
+from __future__ import annotations
 """
 AI Bridge
 Connects the Ryu SDN controller to the FL+RL models.
@@ -9,6 +10,7 @@ import time
 import os
 import sys
 import numpy as np
+
 from stable_baselines3 import PPO
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
@@ -20,7 +22,7 @@ def load_models():
         print(f"Error: RL model not found at {ppo_path}")
         return None, None
     
-    agent = PPO.load(ppo_path)
+    agent = PPO.load(ppo_path, custom_objects={"learning_rate": 0.0, "lr_schedule": lambda _: 0.0, "clip_range": lambda _: 0.0})
     
     # We will instantiate the env to reuse its FL and routing logic
     # Use random TM since we just need the environment's internal logic, 
@@ -41,7 +43,7 @@ def main():
     print("AI Bridge initialized. Waiting for SDN stats...")
     
     while True:
-        time.sleep(10) # 10s decision epoch
+        time.sleep(3) # Polling check
         
         stats_file = '/tmp/sdn_stats.json'
         if not os.path.exists(stats_file):
