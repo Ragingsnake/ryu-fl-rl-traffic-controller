@@ -32,6 +32,16 @@ matplotlib.use("Agg")  # Non-interactive backend
 import matplotlib.pyplot as plt
 
 
+def get_default_failure_link(env) -> tuple[int, int]:
+    """Finds a valid backbone link in the topology to disable for scenario T5."""
+    candidates = [(8, 12), (4, 5), (0, 4), (1, 4), (0, 1), (0, 2)]
+    for u, v in candidates:
+        if env.topology.has_edge(u, v):
+            return (u, v)
+    edges = list(env.topology.edges())
+    return edges[0] if edges else (0, 1)
+
+
 def run_episode(env, policy_fn, start_idx: int, seed: int, scenario: str = "T1", num_steps: int = 100):
     """Run an episode using the given policy function under a specific scenario and seed."""
     env.reset(seed=seed)
@@ -70,10 +80,12 @@ def run_episode(env, policy_fn, start_idx: int, seed: int, scenario: str = "T1",
     avg_losses = []
     churns = []
 
+    fail_u, fail_v = get_default_failure_link(env)
+
     for step in range(num_steps):
-        # Apply link failure for T5 at step 40 (fail primary backbone link 8-12)
+        # Apply link failure for T5 at step 40
         if scenario == "T5" and step == 40:
-            env.disable_link(8, 12)
+            env.disable_link(fail_u, fail_v)
 
         action = policy_fn(obs, env)
         obs, reward, done, _truncated, info = env.step(action)
@@ -90,7 +102,7 @@ def run_episode(env, policy_fn, start_idx: int, seed: int, scenario: str = "T1",
 
     # Cleanup link failure if modified
     if scenario == "T5":
-        env.enable_link(8, 12)
+        env.enable_link(fail_u, fail_v)
 
     # Restore original traffic matrix
     env.tm_data[start_idx : start_idx + num_steps] = original_slice
@@ -108,36 +120,80 @@ def run_episode(env, policy_fn, start_idx: int, seed: int, scenario: str = "T1",
 
 def run_demo():
     parser = argparse.ArgumentParser(description="Multi-Scenario & Multi-Seed FL+RL Evaluation Demo")
+    parser.add_argument("--topology", type=str, default="nsfnet", choices=["nsfnet", "geant", "abilene"], help="Network topology")
     parser.add_argument("--seeds", nargs="+", type=int, default=[42, 43, 44, 45, 46], help="Random seeds for testing")
     parser.add_argument("--steps", type=int, default=100, help="Timesteps per episode")
-    parser.add_argument("--out_dir", type=str, default="results/demo", help="Directory to save generated plots")
+    parser.add_argument("--out_dir", type=str, default=None, help="Directory to save generated plots")
     parser.add_argument("--no_random", action="store_true", help="Skip the Untrained (Random Policy) baseline")
+    parser.add_argument("--rl_model", type=str, default=None, help="Path to trained RL model checkpoint")
+    parser.add_argument("--fl_model", type=str, default=None, help="Path to trained FL model checkpoint")
+    parser.add_argument("--num_managed_od", type=int, default=None, help="Number of managed OD pairs")
     args = parser.parse_args()
 
-    results_dir = Path(args.out_dir)
+    topo = args.topology.lower()
+    if args.out_dir:
+        results_dir = Path(args.out_dir)
+    else:
+        results_dir = Path("results/demo" if topo == "nsfnet" else f"results/demo/{topo}")
     results_dir.mkdir(parents=True, exist_ok=True)
 
-    topo_path = "data/nsfnet_topology.json"
-    tm_path = "data/generated/traffic_matrices.npy"
-    fl_model_path = "models/fl_global_model.pt"
-    rl_model_path = "models/ppo_agent.zip"
+    if topo == "nsfnet":
+        topo_path = "data/nsfnet_topology.json"
+        tm_path = "data/generated/traffic_matrices.npy"
+        domain_data_dir = "data/preprocessed"
+        default_num_managed = 20
+        default_fl = "models/fl_global_model.pt"
+        default_rl = "models/ppo_agent.zip"
+    elif topo == "geant":
+        topo_path = "data/geant_topology.json"
+        tm_path = "data/generated/geant_traffic_matrices.npy"
+        domain_data_dir = "data/preprocessed_geant"
+        default_num_managed = 30
+        default_fl = "models/fl_global_model_geant_fedadam.pt"
+        default_rl = "models/ppo_agent_geant.zip"
+    elif topo == "abilene":
+        topo_path = "data/abilene_topology.json"
+        tm_path = "data/generated/abilene_traffic_matrices.npy"
+        domain_data_dir = "data/preprocessed_abilene"
+        default_num_managed = 15
+        default_fl = "models/fl_global_model_abilene_fedadam.pt"
+        default_rl = "models/ppo_agent_abilene.zip"
+    else:
+        raise ValueError(f"Unsupported topology: {topo}")
+
+    num_managed = args.num_managed_od if args.num_managed_od is not None else default_num_managed
+    fl_model_path = args.fl_model if args.fl_model is not None else default_fl
+    rl_model_path = args.rl_model if args.rl_model is not None else default_rl
+
+    print(f"============================================================")
+    print(f"Running Evaluation Demo on Topology: {topo.upper()}")
+    print(f"  Topology file:    {topo_path}")
+    print(f"  TM file:          {tm_path}")
+    print(f"  FL Model:         {fl_model_path} (exists: {os.path.exists(fl_model_path)})")
+    print(f"  RL Model:         {rl_model_path} (exists: {os.path.exists(rl_model_path)})")
+    print(f"  Domain Data Dir:  {domain_data_dir}")
+    print(f"  Managed OD pairs: {num_managed}")
+    print(f"  Output Dir:       {results_dir}")
+    print(f"============================================================")
 
     if not (os.path.exists(topo_path) and os.path.exists(tm_path)):
-        print("Data files not found. Please run: python scripts/run_full_pipeline.py --quick")
+        print("Data files not found. Please verify preprocessed data.")
         return
 
-    from rl.env import NSFNETRoutingEnv
+    from rl.env import NetworkRoutingEnv
 
-    env = NSFNETRoutingEnv(
+    env = NetworkRoutingEnv(
         topo_path=topo_path,
         tm_path=tm_path,
         fl_model_path=fl_model_path if os.path.exists(fl_model_path) else None,
+        domain_data_dir=domain_data_dir,
+        num_managed_od=num_managed,
     )
 
     if not os.path.exists(rl_model_path):
         raise FileNotFoundError(
             f"Trained RL agent model file not found at '{rl_model_path}'. "
-            "Please ensure models/ppo_agent.zip exists in the repository before running the evaluation demo."
+            f"Please ensure {rl_model_path} exists before running the evaluation demo."
         )
 
     try:
@@ -417,7 +473,8 @@ def run_demo():
             )
             ax.fill_between(timesteps, mean_c - std_c, mean_c + std_c, color=colors[p_name], alpha=0.15)
 
-        ax.axvline(40, color="darkred", linestyle="--", linewidth=1.8, label="Link (8, 12) Fails at t=40")
+        fail_u, fail_v = get_default_failure_link(env)
+        ax.axvline(40, color="darkred", linestyle="--", linewidth=1.8, label=f"Link ({fail_u}, {fail_v}) Fails at t=40")
         if thresh:
             ax.axhline(0.90, color="red", linestyle=":", label="Threshold (0.90)")
         ax.set_title(f"T5 Link Failure: {m_label}", fontsize=11, fontweight="bold")

@@ -24,11 +24,20 @@ build/
 # Data generated (heavy synthetic matrices)
 data/generated/
 data/preprocessed/
+data/preprocessed_abilene/
+data/preprocessed_geant/
 
 # Models: Ignore temporary models, but track trained production weights
 models/*
 !models/ppo_agent.zip
+!models/ppo_agent_abilene.zip
+!models/ppo_agent_geant.zip
 !models/fl_global_model.pt
+!models/fl_global_model_abilene_fedadam.pt
+!models/fl_global_model_geant_fedadam.pt
 
 # Results: Generated locally or in CI artifacts, not committed to git
 results/
+
+# Untracked critique
+KIET_BRANCH_CRITIQUE_AND_COMPARISON.md

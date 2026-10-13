@@ -110,7 +110,15 @@ class NSFNETRoutingEnv(gym.Env):
 
     metadata = {"render_modes": ["console"]}
 
-    def __init__(self, topo_path: str, tm_path: str, fl_model_path: Optional[str] = None, surge_prob: float = 0.0):
+    def __init__(
+        self,
+        topo_path: str,
+        tm_path: str,
+        fl_model_path: Optional[str] = None,
+        surge_prob: float = 0.0,
+        domain_data_dir: Optional[str] = None,
+        num_managed_od: int = 20,
+    ):
         super().__init__()
         self.surge_prob = surge_prob
 
@@ -133,23 +141,22 @@ class NSFNETRoutingEnv(gym.Env):
             self.edges.append((u, v))
             self.edges.append((v, u))
 
-        # Keep consistent edge ordering (42 directed links)
+        # Keep consistent edge ordering
         self.edges = sorted(self.topology.edges())
         self.edge_to_idx = {e: i for i, e in enumerate(self.edges)}
         self.num_edges = len(self.edges)
 
         # --- 2. Load Traffic Matrices ---
-        # Shape: (8064, 14, 14)
         if os.path.exists(tm_path):
             self.tm_data = np.load(tm_path)
         else:
             print(f"Warning: TM data not found at {tm_path}. Using random mock data.")
-            self.tm_data = np.random.rand(8064, 14, 14) * 2.0  # Mbps
+            self.tm_data = np.random.rand(8064, self.topology.number_of_nodes(), self.topology.number_of_nodes()) * 2.0  # Mbps
 
         self.num_nodes = self.tm_data.shape[1]
         self.dataset_len = self.tm_data.shape[0]
 
-        # Find top 20 OD pairs by average traffic
+        # Find top OD pairs by average traffic
         avg_tm = np.mean(self.tm_data, axis=0)
         od_pairs = []
         for i in range(self.num_nodes):
@@ -158,8 +165,9 @@ class NSFNETRoutingEnv(gym.Env):
                     od_pairs.append((i, j, avg_tm[i, j]))
 
         od_pairs.sort(key=lambda x: x[2], reverse=True)
-        self.managed_od_pairs = [(u, v) for u, v, _ in od_pairs[:20]]
-        self.unmanaged_od_pairs = [(u, v) for u, v, _ in od_pairs[20:]]
+        actual_managed = min(num_managed_od, len(od_pairs))
+        self.managed_od_pairs = [(u, v) for u, v, _ in od_pairs[:actual_managed]]
+        self.unmanaged_od_pairs = [(u, v) for u, v, _ in od_pairs[actual_managed:]]
         self.num_managed = len(self.managed_od_pairs)
 
         # --- 3. Pre-compute K=3 shortest paths ---
@@ -184,7 +192,7 @@ class NSFNETRoutingEnv(gym.Env):
         # State: num_edges (util) + num_edges (predicted util) + num_managed (demands)
         obs_dim = self.num_edges * 2 + self.num_managed
         self.observation_space = spaces.Box(low=0.0, high=1.0, shape=(obs_dim,), dtype=np.float32)
-        # Action: 20 choices of 3 paths
+        # Action: choices of K paths for managed OD pairs
         self.action_space = spaces.MultiDiscrete([self.K] * self.num_managed)
 
         # --- 5. State Variables ---
@@ -195,7 +203,7 @@ class NSFNETRoutingEnv(gym.Env):
         self.last_action = np.zeros(self.num_managed, dtype=np.int32)
 
         # Load FL model
-        self.fl_model = DomainPredictor(fl_model_path) if fl_model_path else None
+        self.fl_model = DomainPredictor(fl_model_path, data_dir=domain_data_dir) if fl_model_path else None
 
     def _recompute_paths(self):
         G_filtered = self.topology.copy()
@@ -367,11 +375,15 @@ class NSFNETRoutingEnv(gym.Env):
         for path in managed_paths:
             p_delay = 0.0
             p_success = 1.0
-            for j in range(len(path) - 1):
-                e = (path[j], path[j + 1])
-                idx = self.edge_to_idx[e]
-                p_delay += link_delays[idx]
-                p_success *= 1.0 - link_losses[idx]
+            if len(path) <= 1:
+                p_delay = MAX_QUEUE_DELAY_MS
+                p_success = 0.0
+            else:
+                for j in range(len(path) - 1):
+                    e = (path[j], path[j + 1])
+                    idx = self.edge_to_idx[e]
+                    p_delay += link_delays[idx]
+                    p_success *= 1.0 - link_losses[idx]
 
             total_delay += p_delay
             total_loss += 1.0 - p_success
@@ -400,6 +412,10 @@ class NSFNETRoutingEnv(gym.Env):
         }
 
         return obs, float(reward), done, truncated, info
+
+
+# Canonical alias for multi-topology environment
+NetworkRoutingEnv = NSFNETRoutingEnv
 
 
 if __name__ == "__main__":

@@ -160,25 +160,31 @@ def generate_temporal_tms(base_tm: np.ndarray, alpha: float, num_timesteps: int 
 
 def main():
     """Main execution function for generating synthetic TMs."""
-    print("Starting Traffic Matrix generation...")
-    base_path = Path(__file__).parent
-    topo_path = base_path / "nsfnet_topology.json"
-    out_dir = base_path / "generated"
-    out_dir.mkdir(parents=True, exist_ok=True)
+    import argparse
 
-    topology = load_topology(str(topo_path))
+    parser = argparse.ArgumentParser(description="Generate synthetic Traffic Matrices using Gravity Model")
+    parser.add_argument("--topo", type=str, default="data/nsfnet_topology.json", help="Path to topology JSON")
+    parser.add_argument("--out", type=str, default="data/generated/traffic_matrices.npy", help="Path to output .npy file")
+    parser.add_argument("--timesteps", type=int, default=8064, help="Number of timesteps to generate")
+    parser.add_argument("--utilization", type=float, default=0.85, help="Target peak link utilization")
+    args = parser.parse_args()
+
+    print(f"Starting Traffic Matrix generation for topology: {args.topo}...")
+    out_file = Path(args.out)
+    out_file.parent.mkdir(parents=True, exist_ok=True)
+
+    topology = load_topology(args.topo)
     G = build_graph(topology)
 
-    print("Building base gravity model...")
+    print(f"Building base gravity model for {G.number_of_nodes()} nodes...")
     base_tm = generate_base_tms(G)
 
-    print("Scaling to target capacity...")
-    alpha = scale_alpha(G, base_tm, target_utilization=0.85)
+    print(f"Scaling to target capacity ({args.utilization * 100:.0f}% max link load)...")
+    alpha = scale_alpha(G, base_tm, target_utilization=args.utilization)
 
-    print("Generating temporal traffic matrices (8064 timesteps)...")
-    tms = generate_temporal_tms(base_tm, alpha, num_timesteps=8064)
+    print(f"Generating temporal traffic matrices ({args.timesteps} timesteps)...")
+    tms = generate_temporal_tms(base_tm, alpha, num_timesteps=args.timesteps)
 
-    out_file = out_dir / "traffic_matrices.npy"
     np.save(str(out_file), tms)
     print(f"Generated TMs saved to: {out_file}")
     print(f"TM shape: {tms.shape}, Mean demand: {np.mean(tms):.2f} bps, Max demand: {np.max(tms):.2f} bps")

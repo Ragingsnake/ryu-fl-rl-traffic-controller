@@ -36,16 +36,45 @@ def compute_metrics(y_true, y_pred):
 
 
 def main():
-    print("Starting FL Prediction Evaluation...")
-    base_path = Path(__file__).parent.parent
-    data_dir = base_path / "data" / "preprocessed"
-    model_path = base_path / "models" / "fl_global_model.pt"
-    results_dir = base_path / "results"
+    import argparse
 
+    parser = argparse.ArgumentParser(description="Evaluate FL Prediction Model")
+    parser.add_argument("--topology", type=str, default="nsfnet", choices=["nsfnet", "geant", "abilene"], help="Network topology")
+    parser.add_argument("--model_path", type=str, default=None, help="Path to trained FL model checkpoint")
+    parser.add_argument("--results_csv", type=str, default=None, help="Path to output CSV")
+    args = parser.parse_args()
+
+    print(f"Starting FL Prediction Evaluation on topology: {args.topology.upper()}...")
+    base_path = Path(__file__).parent.parent
+    if args.topology == "nsfnet":
+        data_dir = base_path / "data" / "preprocessed"
+    else:
+        data_dir = base_path / "data" / f"preprocessed_{args.topology}"
+
+    if args.model_path:
+        model_path = Path(args.model_path)
+    else:
+        # Default priority: topology-specific fedadam model, then generic
+        candidate = base_path / "models" / f"fl_global_model_{args.topology}_fedadam.pt"
+        if candidate.exists():
+            model_path = candidate
+        else:
+            model_path = base_path / "models" / "fl_global_model.pt"
+
+    results_dir = base_path / "results"
     results_dir.mkdir(parents=True, exist_ok=True)
+
+    if args.results_csv:
+        out_csv = Path(args.results_csv)
+    else:
+        if args.topology == "nsfnet":
+            out_csv = results_dir / "fl_prediction_metrics.csv"
+        else:
+            out_csv = results_dir / f"fl_prediction_metrics_{args.topology}.csv"
 
     global_state_dict = None
     if model_path.exists():
+        print(f"Loading FL model checkpoint from: {model_path}")
         global_state_dict = torch.load(model_path, map_location="cpu")
     else:
         print(f"Warning: {model_path} not found. Ensure the FL model is trained.")
@@ -115,7 +144,6 @@ def main():
 
     if results_list:
         df = pd.DataFrame(results_list)
-        out_csv = results_dir / "fl_prediction_metrics.csv"
         df.to_csv(out_csv, index=False)
         print(f"\nResults saved to {out_csv}")
 
