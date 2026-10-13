@@ -5,6 +5,9 @@ import time
 from pathlib import Path
 from typing import Any
 
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+
 # Ensure project root is in sys.path when executed directly
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
