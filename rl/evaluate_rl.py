@@ -11,6 +11,7 @@ if hasattr(sys.stdout, "reconfigure"):
 # Ensure project root is in sys.path when executed directly
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 from scipy.stats import wilcoxon
@@ -307,6 +308,53 @@ def run_evaluations(args: argparse.Namespace):
     print("\nResults saved to:")
     print("  - results/benchmark_results.csv")
     print("  - results/summary_table.csv")
+
+    # Generate charts
+    plot_evaluation_charts(df_summary, "results/demo")
+
+
+def plot_evaluation_charts(df_summary: pd.DataFrame, output_dir: str = "results/demo"):
+    """Generates comparison bar charts across scenarios and baselines."""
+    os.makedirs(output_dir, exist_ok=True)
+    scenarios = df_summary["Scenario"].unique()
+    baselines = df_summary["Baseline"].unique()
+
+    metrics = [
+        ("MLU (Mean)", "Maximum Link Utilization (MLU)", "benchmark_mlu_comparison.png"),
+        ("Delay (ms)", "End-to-End Delay (ms)", "benchmark_delay_comparison.png"),
+        ("Loss Rate", "Packet Loss Ratio", "benchmark_loss_comparison.png"),
+        ("Throughput (%)", "Throughput (%)", "benchmark_throughput_comparison.png"),
+    ]
+
+    colors = ["#4C72B0", "#DD8452", "#55A868", "#C44E52", "#8172B3"]
+
+    for col_name, ylabel, filename in metrics:
+        if col_name not in df_summary.columns:
+            continue
+
+        fig, ax = plt.subplots(figsize=(10, 5))
+        x = np.arange(len(scenarios))
+        width = 0.8 / len(baselines)
+
+        for i, baseline in enumerate(baselines):
+            sub = df_summary[df_summary["Baseline"] == baseline]
+            # Match scenarios in order
+            vals = [sub[sub["Scenario"] == s][col_name].values[0] if len(sub[sub["Scenario"] == s]) > 0 else 0 for s in scenarios]
+            ax.bar(x + i * width, vals, width, label=baseline, color=colors[i % len(colors)], alpha=0.85)
+
+        ax.set_xlabel("Scenario", fontsize=11, fontweight="bold")
+        ax.set_ylabel(ylabel, fontsize=11, fontweight="bold")
+        ax.set_title(f"Benchmark Comparison: {ylabel}", fontsize=13, fontweight="bold")
+        ax.set_xticks(x + width * (len(baselines) - 1) / 2)
+        ax.set_xticklabels(scenarios, fontsize=10)
+        ax.legend(title="Baseline", frameon=True)
+        ax.grid(axis="y", linestyle="--", alpha=0.5)
+
+        plt.tight_layout()
+        out_path = os.path.join(output_dir, filename)
+        plt.savefig(out_path, dpi=300)
+        plt.close(fig)
+        print(f"  - Chart saved: {out_path}")
 
 
 if __name__ == "__main__":

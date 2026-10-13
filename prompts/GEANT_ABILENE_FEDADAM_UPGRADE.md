@@ -15,8 +15,8 @@ The current production system operates on **NSFNET** ($|V|=14, |E|=42$ directed 
 3. **Flower FedAvg Strategy**: Parameter averaging across clients with synchronous fallback.
 
 ### New Requirements to Implement:
-1. **Topology Generalization**:
-   - Primary Training Benchmark: **GÉANT** ($|V|=22, |E|=72$ directed links, 3 domains, 462 OD pairs, top 30 managed).
+1. **Topology & Dataset Generalization**:
+   - Primary Training Benchmark: **GÉANT** ($|V|=22, |E|=72$ directed links, 3 domains, 462 OD pairs, top 30 managed) using **real SNDlib/TOTEM NetFlow traces** as primary dataset and calibrated **synthetic gravity generation** as deterministic fallback.
    - Real-Trace Evaluation Benchmark: **Abilene** ($|V|=12, |E|=30$ directed links, 132 OD pairs, parsed from real historical NetFlow matrices in `Abilene_Evaluation.csv`).
    - Dynamic Environment Scaling: Parameterize `rl/env.py`, `rl/train_rl.py`, and `rl/evaluate_rl.py` so topology path, TM path, domain mappings, and managed OD pair count are configurable via CLI arguments without hardcoding.
 2. **FL Strategy Upgrade (FedAvg → FedAdam)**:
@@ -47,6 +47,9 @@ The current production system operates on **NSFNET** ($|V|=14, |E|=42$ directed 
 - Managed OD Pairs: $N_{\text{OD}} = 30$ (accounting for ~65% of total network traffic).
 - State Dimension: $72 \text{ (current)} + 72 \text{ (predicted)} + 30 \text{ (demands)} = 174$.
 - Action Dimension: `spaces.MultiDiscrete([3] * 30)`.
+- **Dataset Strategy (Dual Approach)**:
+  - **Primary (Real Traces)**: Download & ingest historical SNDlib / TOTEM GÉANT traffic matrices (2005 15-minute NetFlow XML/gzip or CSV archives, normalized to Mbps).
+  - **Fallback (Synthetic Gravity Model)**: Calibrated gravity model generator with diurnal sinusoidal wave patterns in `data/generate_tm.py --topo data/geant_topology.json`.
 
 ### 2.3 Abilene (Real NetFlow Trace Network)
 - Topology File: `data/abilene_topology.json`.
@@ -114,12 +117,20 @@ Create `data/load_abilene.py`:
 - Resample / verify no missing timestamps.
 - Export as `data/generated/abilene_traffic_matrices.npy` of shape `(N_timesteps, 12, 12)` in Mbps.
 
-### Step 3: Generalize Synthetic TM Generator for GÉANT
-Extend `data/generate_tm.py`:
-- Accept CLI argument `--topo data/geant_topology.json`.
-- Dynamically extract node population weights and hop-count matrix.
+### Step 3: GÉANT Traffic Dataset Pipeline (Primary Real Traces + Synthetic Fallback)
+#### Step 3A: Real GÉANT Trace Downloader & Ingestion Script (`data/load_geant_real.py`)
+- Source: SNDlib GÉANT benchmark archive / TOTEM project repository (462 OD pairs, 22 nodes, 15-minute sampling intervals).
+- Download and parse raw GÉANT XML or matrix text files into a clean NumPy array of shape `(N_timesteps, 22, 22)`.
+- Handle node name-to-index mapping matching `data/geant_topology.json`.
+- Normalize traffic volumes from raw kbps/bps to simulation units (Mbps).
+- Export to `data/generated/geant_real_traffic_matrices.npy`.
+
+#### Step 3B: Synthetic TM Generator Fallback (`data/generate_tm.py`)
+- Extend `data/generate_tm.py` to accept CLI argument `--topo data/geant_topology.json`.
+- Dynamically extract node population weights and hop-count matrix for the 22-node European topology.
 - Calibrate $\alpha$ using shortest path routing to achieve 85% peak link utilization.
-- Output `data/generated/geant_traffic_matrices.npy` of shape `(8064, 22, 22)`.
+- Output `data/generated/geant_synthetic_traffic_matrices.npy` of shape `(8064, 22, 22)`.
+- This serves as a deterministic fallback if external dataset hosting is unreachable or for controlled diurnal stress tests.
 
 ### Step 4: Multi-Topology Preprocessing (`data/preprocess.py`)
 Modify `data/preprocess.py` to support `--topology [nsfnet|geant|abilene]`:
