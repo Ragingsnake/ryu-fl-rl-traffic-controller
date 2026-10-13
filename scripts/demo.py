@@ -309,9 +309,9 @@ def run_demo():
     print(f"\nGenerating rich comparative plots in {results_dir.resolve()}...")
 
     colors = {"OSPF": "#1f77b4", "Random": "#ff7f0e", "Trained": "#2ca02c"}
-    styles = {"OSPF": "-", "Random": "--", "Trained": "-"}
-    widths = {"OSPF": 1.8, "Random": 1.2, "Trained": 2.2}
-    alphas = {"OSPF": 0.9, "Random": 0.6, "Trained": 1.0}
+    styles = {"OSPF": "-", "Random": ":", "Trained": "--"}
+    widths = {"OSPF": 2.8, "Random": 1.4, "Trained": 2.2}
+    alphas = {"OSPF": 0.95, "Random": 0.7, "Trained": 0.95}
 
     # 1. Five-Panel Timelines for All Metrics (Averaged across seeds with std shading)
     metric_configs = [
@@ -334,7 +334,9 @@ def run_demo():
                 std_curve = np.std(matrix, axis=0)
 
                 label_p = (
-                    "OSPF-SPF" if p_name == "OSPF" else ("Random Policy" if p_name == "Random" else "Trained FL+RL")
+                    "OSPF-SPF (Shortest Path)"
+                    if p_name == "OSPF"
+                    else ("Untrained (Random Policy)" if p_name == "Random" else "Trained FL+RL Agent")
                 )
                 ax.plot(
                     timesteps,
@@ -363,8 +365,7 @@ def run_demo():
             ax.set_xticks([0, 24, 48, 72, 96, 100])
             ax.set_xticklabels(["08:00", "10:00", "12:00", "14:00 (Peak)", "16:00", "16:20"], fontsize=8)
             ax.grid(True, linestyle="--", alpha=0.5)
-            if idx == 0:
-                ax.legend(loc="upper right", framealpha=0.9)
+            ax.legend(loc="upper right", framealpha=0.9, fontsize=8)
 
         axes[-1].set_xlabel("Time of Day (08:00 AM - 04:20 PM / 5-minute intervals)", fontsize=11)
         plt.tight_layout()

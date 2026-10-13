@@ -400,6 +400,14 @@ def plot_evaluation_charts(df_summary: pd.DataFrame, output_dir: str = "results/
     scenarios = df_summary["Scenario"].unique()
     baselines = df_summary["Baseline"].unique()
 
+    baseline_labels = {
+        "B1": "OSPF-SPF (B1)",
+        "B2": "ECMP (B2)",
+        "B3": "RL-Only / Reactive (B3)",
+        "B4": "Centralized LSTM+RL (B4)",
+        "Proposed": "Proposed FL+RL",
+    }
+
     metrics = [
         ("MLU (Mean)", "Maximum Link Utilization (MLU)", "benchmark_mlu_comparison.png"),
         ("Delay (ms)", "End-to-End Delay (ms)", "benchmark_delay_comparison.png"),
@@ -407,28 +415,29 @@ def plot_evaluation_charts(df_summary: pd.DataFrame, output_dir: str = "results/
         ("Throughput (%)", "Throughput (%)", "benchmark_throughput_comparison.png"),
     ]
 
-    colors = ["#4C72B0", "#DD8452", "#55A868", "#C44E52", "#8172B3"]
+    colors = ["#DD8452", "#937860", "#8172B3", "#55A868", "#4C72B0"]
 
+    # 1. Full 5-baseline comparison charts
     for col_name, ylabel, filename in metrics:
         if col_name not in df_summary.columns:
             continue
 
-        fig, ax = plt.subplots(figsize=(10, 5))
+        fig, ax = plt.subplots(figsize=(11, 5.5))
         x = np.arange(len(scenarios))
         width = 0.8 / len(baselines)
 
         for i, baseline in enumerate(baselines):
             sub = df_summary[df_summary["Baseline"] == baseline]
-            # Match scenarios in order
             vals = [sub[sub["Scenario"] == s][col_name].values[0] if len(sub[sub["Scenario"] == s]) > 0 else 0 for s in scenarios]
-            ax.bar(x + i * width, vals, width, label=baseline, color=colors[i % len(colors)], alpha=0.85)
+            b_label = baseline_labels.get(baseline, baseline)
+            ax.bar(x + i * width, vals, width, label=b_label, color=colors[i % len(colors)], alpha=0.85)
 
         ax.set_xlabel("Scenario", fontsize=11, fontweight="bold")
         ax.set_ylabel(ylabel, fontsize=11, fontweight="bold")
-        ax.set_title(f"Benchmark Comparison: {ylabel}", fontsize=13, fontweight="bold")
+        ax.set_title(f"Comprehensive Benchmark Comparison: {ylabel}", fontsize=13, fontweight="bold")
         ax.set_xticks(x + width * (len(baselines) - 1) / 2)
-        ax.set_xticklabels(scenarios, fontsize=10)
-        ax.legend(title="Baseline", frameon=True)
+        ax.set_xticklabels(scenarios, fontsize=10, fontweight="bold")
+        ax.legend(title="Routing Method", frameon=True, fontsize=9)
         ax.grid(axis="y", linestyle="--", alpha=0.5)
 
         plt.tight_layout()
@@ -436,6 +445,48 @@ def plot_evaluation_charts(df_summary: pd.DataFrame, output_dir: str = "results/
         plt.savefig(out_path, dpi=300)
         plt.close(fig)
         print(f"  - Chart saved: {out_path}")
+
+    # 2. Focused Direct Comparison: OSPF-SPF vs Proposed FL+RL
+    if "B1" in baselines and "Proposed" in baselines:
+        focused_metrics = [
+            ("MLU (Mean)", "Maximum Link Utilization (MLU)", "ospf_vs_trained_mlu.png", False),
+            ("Delay (ms)", "End-to-End Delay (ms)", "ospf_vs_trained_delay.png", False),
+            ("Loss Rate", "Packet Loss Ratio (%)", "ospf_vs_trained_loss.png", True),
+        ]
+        for col_name, ylabel, filename, is_pct in focused_metrics:
+            if col_name not in df_summary.columns:
+                continue
+
+            fig, ax = plt.subplots(figsize=(8.5, 4.8))
+            x = np.arange(len(scenarios))
+            width = 0.35
+
+            sub_b1 = df_summary[df_summary["Baseline"] == "B1"]
+            sub_prop = df_summary[df_summary["Baseline"] == "Proposed"]
+
+            vals_b1 = [sub_b1[sub_b1["Scenario"] == s][col_name].values[0] if len(sub_b1[sub_b1["Scenario"] == s]) > 0 else 0 for s in scenarios]
+            vals_prop = [sub_prop[sub_prop["Scenario"] == s][col_name].values[0] if len(sub_prop[sub_prop["Scenario"] == s]) > 0 else 0 for s in scenarios]
+
+            if is_pct:
+                vals_b1 = [v * 100.0 for v in vals_b1]
+                vals_prop = [v * 100.0 for v in vals_prop]
+
+            rects1 = ax.bar(x - width/2, vals_b1, width, label="OSPF-SPF (Industry Standard)", color="#DD8452", alpha=0.9)
+            rects2 = ax.bar(x + width/2, vals_prop, width, label="Proposed Trained FL+RL Agent", color="#4C72B0", alpha=0.9)
+
+            ax.set_xlabel("Test Scenario", fontsize=11, fontweight="bold")
+            ax.set_ylabel(ylabel, fontsize=11, fontweight="bold")
+            ax.set_title(f"OSPF vs. Trained Model Comparison: {ylabel}", fontsize=12, fontweight="bold")
+            ax.set_xticks(x)
+            ax.set_xticklabels(scenarios, fontsize=10, fontweight="bold")
+            ax.legend(frameon=True, fontsize=10)
+            ax.grid(axis="y", linestyle="--", alpha=0.5)
+
+            plt.tight_layout()
+            out_path = os.path.join(output_dir, filename)
+            plt.savefig(out_path, dpi=300)
+            plt.close(fig)
+            print(f"  - Direct OSPF vs Proposed chart saved: {out_path}")
 
 
 if __name__ == "__main__":
