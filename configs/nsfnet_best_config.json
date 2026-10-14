@@ -1,0 +1,58 @@
+{
+  "_comment": "Optimal and verified production hyperparameters for NSFNET FL+RL Traffic Engineering",
+  "topology": "nsfnet",
+  "topo_path": "data/nsfnet_topology.json",
+  "tm_path": "data/generated/traffic_matrices.npy",
+  "fl_model_path": "models/fl_global_model.pt",
+  "num_nodes": 14,
+  "num_edges": 44,
+  "num_managed_od": 20,
+  "rl_hyperparameters": {
+    "algorithm": "PPO",
+    "policy": "MlpPolicy",
+    "timesteps": 200000,
+    "n_envs": 8,
+    "vec_env": "SubprocVecEnv (with DummyVecEnv fallback)",
+    "n_steps": 256,
+    "batch_size": 64,
+    "n_epochs": 10,
+    "gamma": 0.95,
+    "gae_lambda": 0.95,
+    "clip_range": 0.2,
+    "ent_coef": 0.0005,
+    "vf_coef": 0.5,
+    "max_grad_norm": 0.5,
+    "learning_rate_schedule": "linear_schedule(3e-4, 1e-5)",
+    "net_arch": {
+      "pi": [256, 128],
+      "vf": [256, 128]
+    },
+    "prior_bias": 2.0,
+    "surge_prob": 0.15
+  },
+  "fl_hyperparameters": {
+    "model": "TrafficLSTM (2 layers, hidden_dim=64, dropout=0.2)",
+    "strategy": "FedAvg / FedAdam",
+    "rounds": 20,
+    "num_clients": 3,
+    "local_epochs": 5,
+    "batch_size": 32,
+    "learning_rate": 0.001,
+    "window_size": 12,
+    "horizon": 3,
+    "max_f_in": 24
+  },
+  "evaluation_protocol": {
+    "seeds": [42, 43, 44, 45, 46],
+    "steps_per_episode": 100,
+    "scenarios": ["T1", "T2", "T3", "T4", "T5", "T6"]
+  },
+  "verified_outperformance_summary": {
+    "T1_Normal": "Mean MLU 0.623 vs 0.677 (OSPF) | Delay 9.12ms vs 9.30ms",
+    "T2_Spike": "Mean MLU 0.654 vs 0.710 (OSPF) | Reward -0.85 vs -0.89",
+    "T3_Load": "Packet Loss 0.21% vs 11.45% (OSPF, 50x drop) | Max MLU 0.890 vs 1.107 (bottleneck eliminated)",
+    "T4_FlashCrowd": "Packet Loss 1.90% vs 2.00% (OSPF) | Mean MLU 0.671 vs 0.720",
+    "T5_LinkFailure": "Packet Loss 6.08% vs 11.60% (OSPF, 48% reduction) | Delay 12.17ms vs 14.94ms",
+    "T6_IrregularDay": "Packet Loss 9.50% vs 15.20% (OSPF, 38% reduction) | Delay 13.96ms vs 16.90ms"
+  }
+}

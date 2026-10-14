@@ -36,24 +36,38 @@ def run_step(command: list[str], step_name: str) -> None:
 
 def main():
     parser = argparse.ArgumentParser(description="End-to-End FL+RL Traffic Engineering Pipeline")
+    parser.add_argument(
+        "--topology", type=str, default="nsfnet", choices=["nsfnet", "geant", "abilene"], help="Topology name"
+    )
+    parser.add_argument(
+        "--strategy", type=str, default="fedadam", choices=["fedavg", "fedadam"], help="FL aggregation strategy"
+    )
     parser.add_argument("--quick", action="store_true", help="Run in quick mode (2 FL rounds, 1000 RL steps)")
     args = parser.parse_args()
 
     # Base commands
-    cmd_generate = [sys.executable, "data/generate_tm.py"]
-    cmd_preprocess = [sys.executable, "data/preprocess.py"]
-    cmd_fl = [sys.executable, "fl/train_fl.py"]
-    cmd_eval_fl = [sys.executable, "fl/evaluate_fl.py"]
-    cmd_rl = [sys.executable, "rl/train_rl.py"]
-    cmd_benchmark = [sys.executable, "rl/evaluate_rl.py"]
+    if args.topology == "nsfnet":
+        topo_json = "data/nsfnet_topology.json"
+    elif args.topology == "geant":
+        topo_json = "data/geant_topology.json"
+    else:
+        topo_json = "data/abilene_topology.json"
+
+    cmd_generate = [sys.executable, "-m", "data.generate_tm", "--topo", topo_json]
+    cmd_preprocess = [sys.executable, "-m", "data.preprocess", "--topology", args.topology]
+    cmd_fl = [sys.executable, "-m", "fl.train_fl", "--topology", args.topology, "--strategy", args.strategy]
+    cmd_eval_fl = [sys.executable, "-m", "fl.evaluate_fl", "--topology", args.topology]
+    cmd_rl = [sys.executable, "-m", "rl.train_rl", "--topology", args.topology]
+    cmd_benchmark = [sys.executable, "-m", "scripts.demo", "--topology", args.topology]
 
     if args.quick:
-        print("Running in QUICK mode...")
+        print(f"Running in QUICK mode for {args.topology} with {args.strategy}...")
+        cmd_generate.extend(["--timesteps", "200"])
         cmd_fl.extend(["--rounds", "2"])
         cmd_rl.extend(["--timesteps", "1000"])
-        cmd_benchmark.extend(["--seeds", "42", "--scenarios", "T1", "T2", "--baselines", "B1", "Proposed"])
+        cmd_benchmark.extend(["--seeds", "42", "--steps", "20"])
     else:
-        print("Running full pipeline...")
+        print(f"Running full pipeline for {args.topology} with {args.strategy}...")
 
     # Validate we're in the right directory
     if not Path("data").exists() or not Path("fl").exists():

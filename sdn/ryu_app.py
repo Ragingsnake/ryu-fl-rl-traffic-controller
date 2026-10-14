@@ -5,45 +5,45 @@ Ryu OpenFlow 1.3 Controller
 - Writes stats to a JSON file for the AI Bridge
 """
 
+import json
+import time
+
 from ryu.app import simple_switch_13
 from ryu.controller import ofp_event
-from ryu.controller.handler import CONFIG_DISPATCHER, MAIN_DISPATCHER, DEAD_DISPATCHER
-from ryu.controller.handler import set_ev_cls
+from ryu.controller.handler import CONFIG_DISPATCHER, DEAD_DISPATCHER, MAIN_DISPATCHER, set_ev_cls
 from ryu.lib import hub
-import time
-import json
-import os
+
 
 class SDNController(simple_switch_13.SimpleSwitch13):
     def __init__(self, *args, **kwargs):
-        super(SDNController, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
         self.datapaths = {}
-        self.stats = {} 
+        self.stats = {}
         self.monitor_thread = hub.spawn(self._monitor)
 
     @set_ev_cls(ofp_event.EventOFPSwitchFeatures, CONFIG_DISPATCHER)
     def switch_features_handler(self, ev):
-        super(SDNController, self).switch_features_handler(ev)
+        super().switch_features_handler(ev)
         datapath = ev.msg.datapath
         self.datapaths[datapath.id] = datapath
         self.stats.setdefault(datapath.id, {})
         try:
-            with open('/tmp/sdn_stats.json', 'w') as f:
+            with open("/tmp/sdn_stats.json", "w") as f:
                 json.dump(self.stats, f)
         except Exception:
             pass
-        self.logger.info('Registered datapath %016x via switch features', datapath.id)
+        self.logger.info("Registered datapath %016x via switch features", datapath.id)
 
     @set_ev_cls(ofp_event.EventOFPStateChange, [MAIN_DISPATCHER, DEAD_DISPATCHER])
     def _state_change_handler(self, ev):
         datapath = ev.datapath
         if ev.state == MAIN_DISPATCHER:
             if datapath.id not in self.datapaths:
-                self.logger.info('register datapath: %016x', datapath.id)
+                self.logger.info("register datapath: %016x", datapath.id)
                 self.datapaths[datapath.id] = datapath
         elif ev.state == DEAD_DISPATCHER:
             if datapath.id in self.datapaths:
-                self.logger.info('unregister datapath: %016x', datapath.id)
+                self.logger.info("unregister datapath: %016x", datapath.id)
                 del self.datapaths[datapath.id]
 
     def _monitor(self):
@@ -52,11 +52,11 @@ class SDNController(simple_switch_13.SimpleSwitch13):
                 self._request_stats(dp)
             if self.stats or self.datapaths:
                 try:
-                    with open('/tmp/sdn_stats.json', 'w') as f:
+                    with open("/tmp/sdn_stats.json", "w") as f:
                         json.dump(self.stats, f)
                 except Exception:
                     pass
-            hub.sleep(5) # Poll every 5 seconds
+            hub.sleep(5)  # Poll every 5 seconds
 
     def _request_stats(self, datapath):
         ofproto = datapath.ofproto
@@ -73,11 +73,11 @@ class SDNController(simple_switch_13.SimpleSwitch13):
             # We track tx_bytes, rx_bytes for utilization calculation
             # Port no > 1000 usually means LOCAL or internal, ignore if needed
             self.stats[dpid][stat.port_no] = {
-                'tx_bytes': stat.tx_bytes,
-                'rx_bytes': stat.rx_bytes,
-                'timestamp': time.time()
+                "tx_bytes": stat.tx_bytes,
+                "rx_bytes": stat.rx_bytes,
+                "timestamp": time.time(),
             }
-        
+
         # Write to JSON for AI Bridge
-        with open('/tmp/sdn_stats.json', 'w') as f:
+        with open("/tmp/sdn_stats.json", "w") as f:
             json.dump(self.stats, f)

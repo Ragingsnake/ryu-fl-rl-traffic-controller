@@ -1,0 +1,33 @@
+{
+    "nodes": [
+        {"id": 0, "label": "ATLA", "city": "Atlanta, GA", "domain": "C", "population_weight": 6.0},
+        {"id": 1, "label": "CHIN", "city": "Chicago, IL", "domain": "B", "population_weight": 5.0},
+        {"id": 2, "label": "DNVR", "city": "Denver, CO", "domain": "A", "population_weight": 3.5},
+        {"id": 3, "label": "HSTN", "city": "Houston, TX", "domain": "B", "population_weight": 5.5},
+        {"id": 4, "label": "IPLS", "city": "Indianapolis, IN", "domain": "B", "population_weight": 3.0},
+        {"id": 5, "label": "KSCY", "city": "Kansas City, MO", "domain": "B", "population_weight": 3.0},
+        {"id": 6, "label": "LOSA", "city": "Los Angeles, CA", "domain": "A", "population_weight": 8.0},
+        {"id": 7, "label": "NYCM", "city": "New York, NY", "domain": "C", "population_weight": 9.0},
+        {"id": 8, "label": "SNVA", "city": "Sunnyvale, CA", "domain": "A", "population_weight": 6.0},
+        {"id": 9, "label": "STTL", "city": "Seattle, WA", "domain": "A", "population_weight": 4.5},
+        {"id": 10, "label": "WASH", "city": "Washington, DC", "domain": "C", "population_weight": 6.5},
+        {"id": 11, "label": "SUNN", "city": "Sunnyside, NY", "domain": "C", "population_weight": 3.0}
+    ],
+    "links": [
+        {"source": 9, "target": 8, "capacity_bps": 10000000, "delay_ms": 5.0},
+        {"source": 9, "target": 2, "capacity_bps": 10000000, "delay_ms": 8.0},
+        {"source": 8, "target": 6, "capacity_bps": 10000000, "delay_ms": 3.0},
+        {"source": 8, "target": 2, "capacity_bps": 10000000, "delay_ms": 7.0},
+        {"source": 6, "target": 3, "capacity_bps": 10000000, "delay_ms": 9.0},
+        {"source": 2, "target": 5, "capacity_bps": 10000000, "delay_ms": 5.0},
+        {"source": 3, "target": 5, "capacity_bps": 10000000, "delay_ms": 6.0},
+        {"source": 3, "target": 0, "capacity_bps": 10000000, "delay_ms": 6.0},
+        {"source": 5, "target": 4, "capacity_bps": 10000000, "delay_ms": 4.0},
+        {"source": 4, "target": 1, "capacity_bps": 10000000, "delay_ms": 3.0},
+        {"source": 4, "target": 0, "capacity_bps": 10000000, "delay_ms": 4.0},
+        {"source": 1, "target": 7, "capacity_bps": 10000000, "delay_ms": 6.0},
+        {"source": 0, "target": 10, "capacity_bps": 10000000, "delay_ms": 5.0},
+        {"source": 10, "target": 7, "capacity_bps": 10000000, "delay_ms": 3.0},
+        {"source": 7, "target": 11, "capacity_bps": 10000000, "delay_ms": 2.0}
+    ]
+}

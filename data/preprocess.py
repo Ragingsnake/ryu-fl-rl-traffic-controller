@@ -122,12 +122,41 @@ def get_domain_edge_indices(G: nx.DiGraph, edges: list[tuple[int, int]], domain_
 
 
 def main():
-    print("Starting data preprocessing...")
-    base_path = Path(__file__).parent
-    topo_path = base_path / "nsfnet_topology.json"
-    tm_path = base_path / "generated" / "traffic_matrices.npy"
-    out_dir = base_path / "preprocessed"
+    import argparse
+
+    parser = argparse.ArgumentParser(description="Preprocess topology and traffic matrices for FL and RL")
+    parser.add_argument(
+        "--topology", type=str, default="nsfnet", choices=["nsfnet", "geant", "abilene"], help="Topology name"
+    )
+    parser.add_argument("--topo_path", type=str, default=None, help="Custom path to topology JSON")
+    parser.add_argument("--tm_path", type=str, default=None, help="Custom path to traffic matrices .npy")
+    parser.add_argument("--out_dir", type=str, default=None, help="Custom output directory")
+    args = parser.parse_args()
+
+    base_path = Path(__file__).resolve().parent
+    root_path = base_path.parent
+
+    # Determine default paths based on topology
+    if args.topology == "nsfnet":
+        topo_path = base_path / "nsfnet_topology.json" if args.topo_path is None else Path(args.topo_path)
+        tm_path = base_path / "generated" / "traffic_matrices.npy" if args.tm_path is None else Path(args.tm_path)
+        out_dir = base_path / "preprocessed" if args.out_dir is None else Path(args.out_dir)
+    elif args.topology == "geant":
+        topo_path = base_path / "geant_topology.json" if args.topo_path is None else Path(args.topo_path)
+        tm_path = base_path / "generated" / "geant_traffic_matrices.npy" if args.tm_path is None else Path(args.tm_path)
+        out_dir = base_path / "preprocessed_geant" if args.out_dir is None else Path(args.out_dir)
+    else:  # abilene
+        topo_path = base_path / "abilene_topology.json" if args.topo_path is None else Path(args.topo_path)
+        tm_path = (
+            base_path / "generated" / "abilene_traffic_matrices.npy" if args.tm_path is None else Path(args.tm_path)
+        )
+        out_dir = base_path / "preprocessed_abilene" if args.out_dir is None else Path(args.out_dir)
+
     out_dir.mkdir(parents=True, exist_ok=True)
+    print(f"Starting data preprocessing for topology: {args.topology}...")
+    print(f"Topology JSON: {topo_path}")
+    print(f"TM source: {tm_path}")
+    print(f"Output directory: {out_dir}")
 
     # 1. Load Data
     topology = load_topology(str(topo_path))
@@ -135,7 +164,7 @@ def main():
     edges = get_sorted_edges(G)
     tms = np.load(str(tm_path))
 
-    print(f"Loaded TMs of shape: {tms.shape}")
+    print(f"Loaded TMs of shape: {tms.shape} ({G.number_of_nodes()} nodes, {len(edges)} directed edges)")
 
     # 2. Compute Link Utilizations
     link_utils = compute_link_utilization(tms, G, edges)
@@ -154,24 +183,23 @@ def main():
     X_global, Y_global = create_windows(link_utils, T, H)
     print(f"Generated global windows - X: {X_global.shape}, Y: {Y_global.shape}")
 
-    # Train/Val/Test splits bounds
-    # Test offset due to sliding window:
-    # train = 0 to 5760 (exclusive)
-    # val = 5760 to 6912
-    # test = 6912 to end
-    split_train = 5760
-    split_val = 6912
+    # Train/Val/Test splits bounds proportionally based on dataset length
+    total_samples = len(X_global)
+    split_train = int(total_samples * 0.70)
+    split_val = int(total_samples * 0.85)
 
     # 4. FL Data Distribution (Domain splitting)
-    domains = ["A", "B", "C"]
+    raw_domains = sorted(list({attr.get("domain") for _, attr in G.nodes(data=True) if attr.get("domain") is not None}))
+    if not raw_domains:
+        raw_domains = ["A", "B", "C"]
 
-    # Map domain letters to numeric IDs for FL client compatibility
-    domain_to_id = {"A": 0, "B": 1, "C": 2}
+    # Map domains to numeric IDs (0, 1, 2)
+    domain_to_id = {d: i for i, d in enumerate(raw_domains)}
 
-    for domain in domains:
-        print(f"Processing Domain {domain}...")
+    for domain in raw_domains:
+        did = domain_to_id[domain]
         domain_idx = get_domain_edge_indices(G, edges, domain)
-        print(f"Domain {domain} monitors {len(domain_idx)} edges.")
+        print(f"Domain {domain} (ID {did}) monitors {len(domain_idx)} edges.")
 
         # Filter features for domain
         X_domain = X_global[:, :, domain_idx]
@@ -191,9 +219,6 @@ def main():
         Y_test = Y_domain[max_val:]
 
         # Save using numeric domain IDs that FL client.py expects
-        # Format: domain_{id}_train_X.npy (flat in preprocessed/)
-        did = domain_to_id[domain]
-
         np.save(str(out_dir / f"domain_{did}_train_X.npy"), X_train.astype(np.float32))
         np.save(str(out_dir / f"domain_{did}_train_Y.npy"), Y_train.astype(np.float32))
         np.save(str(out_dir / f"domain_{did}_val_X.npy"), X_val.astype(np.float32))
@@ -205,7 +230,7 @@ def main():
         with open(str(out_dir / f"domain_{did}_edge_indices.json"), "w") as f:
             json.dump(domain_idx, f)
 
-    print("Preprocessing completed successfully.")
+    print(f"Preprocessing for {args.topology} completed successfully.")
 
 
 if __name__ == "__main__":

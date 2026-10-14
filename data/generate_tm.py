@@ -160,25 +160,51 @@ def generate_temporal_tms(base_tm: np.ndarray, alpha: float, num_timesteps: int 
 
 def main():
     """Main execution function for generating synthetic TMs."""
-    print("Starting Traffic Matrix generation...")
-    base_path = Path(__file__).parent
-    topo_path = base_path / "nsfnet_topology.json"
-    out_dir = base_path / "generated"
+    import argparse
+
+    parser = argparse.ArgumentParser(description="Generate synthetic Traffic Matrices using Gravity Model")
+    parser.add_argument("--topo", type=str, default="data/nsfnet_topology.json", help="Path to topology JSON")
+    parser.add_argument("--out", type=str, default=None, help="Output path for .npy file")
+    parser.add_argument("--timesteps", type=int, default=8064, help="Number of timesteps (default: 8064)")
+    parser.add_argument(
+        "--target_utilization", type=float, default=0.85, help="Target max link utilization (default: 0.85)"
+    )
+    args = parser.parse_args()
+
+    topo_path = Path(args.topo)
+    if not topo_path.is_absolute():
+        base_root = Path(__file__).resolve().parent.parent
+        if (base_root / topo_path).exists():
+            topo_path = base_root / topo_path
+
+    out_dir = Path(__file__).resolve().parent / "generated"
     out_dir.mkdir(parents=True, exist_ok=True)
 
+    if args.out is not None:
+        out_file = Path(args.out)
+    else:
+        # Determine default output filename based on topology
+        stem = topo_path.stem.replace("_topology", "")
+        if stem == "nsfnet":
+            out_file = out_dir / "traffic_matrices.npy"
+        else:
+            out_file = out_dir / f"{stem}_traffic_matrices.npy"
+
+    out_file.parent.mkdir(parents=True, exist_ok=True)
+
+    print(f"Starting Traffic Matrix generation for topology: {topo_path}...")
     topology = load_topology(str(topo_path))
     G = build_graph(topology)
 
-    print("Building base gravity model...")
+    print(f"Building base gravity model for {G.number_of_nodes()} nodes...")
     base_tm = generate_base_tms(G)
 
-    print("Scaling to target capacity...")
-    alpha = scale_alpha(G, base_tm, target_utilization=0.85)
+    print(f"Scaling to target capacity ({args.target_utilization * 100}% MLU)...")
+    alpha = scale_alpha(G, base_tm, target_utilization=args.target_utilization)
 
-    print("Generating temporal traffic matrices (8064 timesteps)...")
-    tms = generate_temporal_tms(base_tm, alpha, num_timesteps=8064)
+    print(f"Generating temporal traffic matrices ({args.timesteps} timesteps)...")
+    tms = generate_temporal_tms(base_tm, alpha, num_timesteps=args.timesteps)
 
-    out_file = out_dir / "traffic_matrices.npy"
     np.save(str(out_file), tms)
     print(f"Generated TMs saved to: {out_file}")
     print(f"TM shape: {tms.shape}, Mean demand: {np.mean(tms):.2f} bps, Max demand: {np.max(tms):.2f} bps")

@@ -36,13 +36,49 @@ def compute_metrics(y_true, y_pred):
 
 
 def main():
-    print("Starting FL Prediction Evaluation...")
-    base_path = Path(__file__).parent.parent
-    data_dir = base_path / "data" / "preprocessed"
-    model_path = base_path / "models" / "fl_global_model.pt"
-    results_dir = base_path / "results"
+    import argparse
 
+    parser = argparse.ArgumentParser(description="Evaluate FL Prediction Performance")
+    parser.add_argument(
+        "--topology", type=str, default="nsfnet", choices=["nsfnet", "geant", "abilene"], help="Topology name"
+    )
+    parser.add_argument("--data_dir", type=str, default=None, help="Directory containing preprocessed data")
+    parser.add_argument("--model_path", type=str, default=None, help="Path to FL model")
+    parser.add_argument("--out_csv", type=str, default=None, help="Output CSV path")
+    args = parser.parse_args()
+
+    base_path = Path(__file__).resolve().parent.parent
+    if args.data_dir is not None:
+        data_dir = Path(args.data_dir)
+    else:
+        data_dir = base_path / (
+            "data/preprocessed" if args.topology == "nsfnet" else f"data/preprocessed_{args.topology}"
+        )
+
+    if args.model_path is not None:
+        model_path = Path(args.model_path)
+    else:
+        # Check candidate locations
+        cand1 = base_path / "models" / f"fl_{args.topology}_fedadam.pt"
+        cand2 = base_path / "models" / f"fl_{args.topology}_fedavg.pt"
+        cand3 = base_path / "models" / "fl_global_model.pt"
+        if cand1.exists():
+            model_path = cand1
+        elif cand2.exists():
+            model_path = cand2
+        else:
+            model_path = cand3
+
+    results_dir = base_path / "results"
     results_dir.mkdir(parents=True, exist_ok=True)
+
+    out_csv = (
+        Path(args.out_csv) if args.out_csv is not None else results_dir / f"fl_{args.topology}_prediction_metrics.csv"
+    )
+
+    print(f"Starting FL Prediction Evaluation for {args.topology}...")
+    print(f"Data directory: {data_dir}")
+    print(f"Model path:     {model_path}")
 
     global_state_dict = None
     if model_path.exists():

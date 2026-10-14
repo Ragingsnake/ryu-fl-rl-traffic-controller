@@ -72,7 +72,9 @@ def plot_training_curves(csv_path: str, output_dir: str = "results/demo") -> Non
     axes[1, 1].set_ylabel("Packet Loss")
     axes[1, 1].xaxis.set_major_formatter(plt.FuncFormatter(lambda x, p: f"{int(x):,}"))
 
-    plt.suptitle("Deep Reinforcement Learning (PPO) Training Dynamics Across Timesteps", fontsize=15, fontweight="bold", y=0.99)
+    plt.suptitle(
+        "Deep Reinforcement Learning (PPO) Training Dynamics Across Timesteps", fontsize=15, fontweight="bold", y=0.99
+    )
     plt.tight_layout()
     diag_path = os.path.join(output_dir, "rl_training_curves.png")
     plt.savefig(diag_path)
@@ -140,4 +142,3 @@ class MetricsCallback(BaseCallback):
 if __name__ == "__main__":
     cb = MetricsCallback(log_dir="./test_logs", verbose=1)
     print("MetricsCallback initialized successfully.")
-

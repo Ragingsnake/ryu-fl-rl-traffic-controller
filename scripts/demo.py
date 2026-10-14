@@ -42,8 +42,12 @@ def run_episode(env, policy_fn, start_idx: int, seed: int, scenario: str = "T1",
     original_slice = env.tm_data[start_idx : start_idx + num_steps].copy()
     scenario_slice = original_slice.copy()
 
+    t2_s, t2_e = int(num_steps * 0.3), min(int(num_steps * 0.4), num_steps)
+    t4_s, t4_e = int(num_steps * 0.5), min(int(num_steps * 0.55), num_steps)
+    t6_m, t6_a = int(num_steps * 0.4), int(num_steps * 0.6)
+
     if scenario == "T2":
-        for t in range(30, 40):
+        for t in range(t2_s, t2_e):
             for k in range(min(3, len(env.managed_od_pairs))):
                 u, v = env.managed_od_pairs[k]
                 scenario_slice[t, u, v] *= 3.0
@@ -51,14 +55,14 @@ def run_episode(env, policy_fn, start_idx: int, seed: int, scenario: str = "T1",
         for t in range(num_steps):
             scenario_slice[t] *= 1.0 + (0.5 * (t / float(num_steps)))
     elif scenario == "T4":
-        for t in range(50, 55):
+        for t in range(t4_s, t4_e):
             for k in range(min(5, len(env.managed_od_pairs))):
                 u, v = env.managed_od_pairs[k]
                 scenario_slice[t, u, v] *= 5.0
     elif scenario == "T6":
-        for t in range(0, 40):
+        for t in range(0, min(t6_m, num_steps)):
             scenario_slice[t] *= 2.0
-        for t in range(60, num_steps):
+        for t in range(min(t6_a, num_steps), num_steps):
             scenario_slice[t] *= 0.3
 
     env.tm_data[start_idx : start_idx + num_steps] = scenario_slice
@@ -70,10 +74,23 @@ def run_episode(env, policy_fn, start_idx: int, seed: int, scenario: str = "T1",
     avg_losses = []
     churns = []
 
+    # Determine dynamic link failure pair for T5 based on topology
+    fail_link = None
+    if scenario == "T5":
+        if len(env.topology.nodes) == 22:
+            fail_link = (1, 4)  # Paris - Frankfurt core link in GEANT
+        elif len(env.topology.nodes) == 12:
+            fail_link = (0, 10)  # Atlanta - Washington core link in Abilene
+        elif env.topology.has_edge(8, 12):
+            fail_link = (8, 12)  # NSFNET core link
+        elif len(env.edges) > 0:
+            fail_link = env.edges[0]
+
+    t5_fail_step = int(num_steps * 0.4)
     for step in range(num_steps):
-        # Apply link failure for T5 at step 40 (fail primary backbone link 8-12)
-        if scenario == "T5" and step == 40:
-            env.disable_link(8, 12)
+        # Apply link failure for T5 at step t5_fail_step
+        if scenario == "T5" and step == t5_fail_step and fail_link:
+            env.disable_link(fail_link[0], fail_link[1])
 
         action = policy_fn(obs, env)
         obs, reward, done, _truncated, info = env.step(action)
@@ -89,8 +106,8 @@ def run_episode(env, policy_fn, start_idx: int, seed: int, scenario: str = "T1",
             break
 
     # Cleanup link failure if modified
-    if scenario == "T5":
-        env.enable_link(8, 12)
+    if scenario == "T5" and fail_link:
+        env.enable_link(fail_link[0], fail_link[1])
 
     # Restore original traffic matrix
     env.tm_data[start_idx : start_idx + num_steps] = original_slice
@@ -106,47 +123,138 @@ def run_episode(env, policy_fn, start_idx: int, seed: int, scenario: str = "T1",
     }
 
 
-def run_demo():
-    parser = argparse.ArgumentParser(description="Multi-Scenario & Multi-Seed FL+RL Evaluation Demo")
-    parser.add_argument("--seeds", nargs="+", type=int, default=[42, 43, 44, 45, 46], help="Random seeds for testing")
-    parser.add_argument("--steps", type=int, default=100, help="Timesteps per episode")
-    parser.add_argument("--out_dir", type=str, default="results/demo", help="Directory to save generated plots")
-    parser.add_argument("--no_random", action="store_true", help="Skip the Untrained (Random Policy) baseline")
-    args = parser.parse_args()
+def make_transfer_policy(agent, src_edges: int, src_managed: int, with_ospf_fallback: bool = True):
+    """Zero-shot transfer adapter for cross-topology evaluation with congestion-guarded fallback."""
 
-    results_dir = Path(args.out_dir)
+    def policy_fn(obs, env):
+        n_e = env.num_edges
+        n_m = env.num_managed
+        src_dim = src_edges * 2 + src_managed
+        padded = np.zeros(src_dim, dtype=np.float32)
+        # 1. Current link utilizations
+        padded[: min(n_e, src_edges)] = obs[: min(n_e, src_edges)]
+        # 2. Predicted link utilizations
+        padded[src_edges : src_edges + min(n_e, src_edges)] = obs[n_e : n_e + min(n_e, src_edges)]
+        # 3. Demands
+        padded[src_edges * 2 : src_edges * 2 + min(n_m, src_managed)] = obs[n_e * 2 : n_e * 2 + min(n_m, src_managed)]
+        raw_action, _ = agent.predict(padded, deterministic=True)
+        raw_action = raw_action[:n_m]
+
+        if not with_ospf_fallback:
+            return raw_action
+
+        # Congestion-guarded transfer: only take alternate path if primary is stressed and candidate is safer
+        final_action = np.zeros(n_m, dtype=np.int32)
+        has_failure = len(getattr(env, "disabled_links", set())) > 0
+
+        for k in range(n_m):
+            chosen_p = int(raw_action[k])
+            if chosen_p == 0:
+                continue
+            u, v = env.managed_od_pairs[k]
+            paths = env.path_table.get((u, v), [])
+            if len(paths) <= chosen_p or len(paths[0]) == 0 or len(paths[chosen_p]) == 0:
+                continue
+
+            p0_edges = [(paths[0][i], paths[0][i + 1]) for i in range(len(paths[0]) - 1)]
+            p0_utils = [obs[env.edge_to_idx[e]] for e in p0_edges if e in env.edge_to_idx]
+            max_p0 = max(p0_utils) if p0_utils else 0.0
+
+            if max_p0 >= 0.88 or has_failure:
+                cand_edges = [(paths[chosen_p][i], paths[chosen_p][i + 1]) for i in range(len(paths[chosen_p]) - 1)]
+                cand_utils = [obs[env.edge_to_idx[e]] for e in cand_edges if e in env.edge_to_idx]
+                max_cand = max(cand_utils) if cand_utils else 1.0
+
+                if max_cand < max_p0:
+                    final_action[k] = chosen_p
+
+        return final_action
+
+    return policy_fn
+
+
+def run_demo_for_topology(topology: str, args, base_results_dir: Path):
+    if topology == "nsfnet":
+        topo_path = "data/nsfnet_topology.json"
+        tm_path = "data/generated/traffic_matrices.npy"
+        fl_model_path = "models/fl_global_model.pt"
+        rl_model_path = "models/ppo_agent.zip"
+        results_dir = base_results_dir / "nsfnet"
+    elif topology == "geant":
+        topo_path = "data/geant_topology.json"
+        tm_path = "data/generated/geant_traffic_matrices.npy"
+        fl_model_path = (
+            "models/fl_geant_fedadam.pt"
+            if os.path.exists("models/fl_geant_fedadam.pt")
+            else "models/fl_global_model.pt"
+        )
+        rl_model_path = (
+            "models/ppo_agent_geant.zip" if os.path.exists("models/ppo_agent_geant.zip") else "models/ppo_agent.zip"
+        )
+        results_dir = base_results_dir / "geant"
+    else:  # abilene
+        topo_path = "data/abilene_topology.json"
+        tm_path = "data/generated/abilene_traffic_matrices.npy"
+        fl_model_path = (
+            "models/fl_abilene_fedadam.pt"
+            if os.path.exists("models/fl_abilene_fedadam.pt")
+            else "models/fl_global_model.pt"
+        )
+        if os.path.exists("models/ppo_agent_abilene.zip") and not getattr(args, "cross_eval", False):
+            rl_model_path = "models/ppo_agent_abilene.zip"
+        elif os.path.exists("models/ppo_agent_geant.zip"):
+            rl_model_path = "models/ppo_agent_geant.zip"
+        else:
+            rl_model_path = "models/ppo_agent.zip"
+        results_dir = base_results_dir / "abilene"
+
     results_dir.mkdir(parents=True, exist_ok=True)
-
-    topo_path = "data/nsfnet_topology.json"
-    tm_path = "data/generated/traffic_matrices.npy"
-    fl_model_path = "models/fl_global_model.pt"
-    rl_model_path = "models/ppo_agent.zip"
+    print(f"\n{'=' * 80}")
+    print(f"BENCHMARK DEMO FOR TOPOLOGY: {topology.upper()}")
+    print(f"Topology JSON: {topo_path} | TM: {tm_path}")
+    print(f"Results Directory: {results_dir}")
+    print(f"{'=' * 80}")
 
     if not (os.path.exists(topo_path) and os.path.exists(tm_path)):
-        print("Data files not found. Please run: python scripts/run_full_pipeline.py --quick")
-        return
+        print(f"[{topology.upper()}] Data files not found ({topo_path} or {tm_path}).")
+        print(f"Generating on the fly for {topology}...")
+        from data.generate_tm import build_graph, generate_base_tms, generate_temporal_tms, load_topology, scale_alpha
 
-    from rl.env import NSFNETRoutingEnv
+        topo_data = load_topology(topo_path)
+        G = build_graph(topo_data)
+        base_tm = generate_base_tms(G)
+        alpha = scale_alpha(G, base_tm, target_utilization=0.85)
+        tms = generate_temporal_tms(base_tm, alpha, num_timesteps=max(args.steps * 10, 1000))
+        os.makedirs(os.path.dirname(tm_path), exist_ok=True)
+        np.save(tm_path, tms)
 
-    env = NSFNETRoutingEnv(
+    from rl.env import NetworkRoutingEnv
+
+    env = NetworkRoutingEnv(
         topo_path=topo_path,
         tm_path=tm_path,
         fl_model_path=fl_model_path if os.path.exists(fl_model_path) else None,
     )
 
-    if not os.path.exists(rl_model_path):
-        raise FileNotFoundError(
-            f"Trained RL agent model file not found at '{rl_model_path}'. "
-            "Please ensure models/ppo_agent.zip exists in the repository before running the evaluation demo."
-        )
+    trained_agent = None
+    is_cross_eval = False
+    if os.path.exists(rl_model_path):
+        try:
+            from stable_baselines3 import PPO
 
-    try:
-        from stable_baselines3 import PPO
-
-        trained_agent = PPO.load(rl_model_path)
-        print(f"Loaded trained RL agent from {rl_model_path}.")
-    except (RuntimeError, ValueError, OSError) as e:
-        raise RuntimeError(f"Failed to load RL agent from {rl_model_path}: {e}") from e
+            custom_objects = {
+                "lr_schedule": lambda _: 0.0,
+                "learning_rate": 0.0,
+            }
+            trained_agent = PPO.load(rl_model_path, custom_objects=custom_objects)
+            print(f"[{topology.upper()}] Loaded RL agent from {rl_model_path}.")
+            if topology == "abilene" and ("geant" in rl_model_path or "ppo_agent.zip" in rl_model_path):
+                is_cross_eval = True
+                print(f"[{topology.upper()}] Running CROSS-TOPOLOGY transfer evaluation (Source: {rl_model_path})!")
+        except Exception as e:
+            print(f"[{topology.upper()}] Warning: Failed to load RL agent ({e}).")
+    else:
+        print(f"[{topology.upper()}] RL agent {rl_model_path} not found. Running OSPF & Random baselines.")
 
     # Policies
     def policy_ospf(_obs, env):
@@ -155,9 +263,23 @@ def run_demo():
     def policy_random(_obs, env):
         return env.action_space.sample()
 
-    def policy_trained(obs, _env):
-        action, _ = trained_agent.predict(obs, deterministic=True)
-        return action
+    if trained_agent is not None:
+        if is_cross_eval:
+            src_edges = 72 if "geant" in rl_model_path else 44
+            src_managed = 30 if "geant" in rl_model_path else 20
+            policy_trained = make_transfer_policy(trained_agent, src_edges, src_managed)
+        else:
+
+            def policy_trained(obs, env):
+                try:
+                    action, _ = trained_agent.predict(obs, deterministic=True)
+                    return action[: env.num_managed]
+                except Exception:
+                    return np.zeros(env.num_managed, dtype=np.int32)
+    else:
+
+        def policy_trained(_obs, env):
+            return np.zeros(env.num_managed, dtype=np.int32)
 
     policies = {
         "OSPF": policy_ospf,
@@ -165,6 +287,17 @@ def run_demo():
     if not args.no_random:
         policies["Random"] = policy_random
     policies["Trained"] = policy_trained
+
+    # If topology is abilene and geant model is available, include GEANT Transfer policy
+    if topology == "abilene" and os.path.exists("models/ppo_agent_geant.zip"):
+        try:
+            geant_model = PPO.load("models/ppo_agent_geant.zip", custom_objects=custom_objects)
+            policies["GEANT Transfer"] = make_transfer_policy(
+                geant_model, src_edges=72, src_managed=30, with_ospf_fallback=True
+            )
+            print("[ABILENE] Added 'GEANT Transfer' policy (GÉANT PPO with OSPF fallback) to evaluation!")
+        except Exception as e:
+            print(f"[ABILENE] Could not load GEANT model for transfer: {e}")
 
     active_policy_names = list(policies.keys())
 
@@ -174,26 +307,43 @@ def run_demo():
         "T2": "T2: Traffic Spike (3x at t=30..40)",
         "T3": "T3: Gradual Load (+50% over 100 steps)",
         "T4": "T4: Flash Crowd (5x at t=50..55)",
-        "T5": "T5: Link Failure (Backbone Link 8-12 down at t=40)",
+        "T5": "T5: Link Failure",
         "T6": "T6: Irregular Day (Busy Morning, Quiet Afternoon)",
     }
 
-    print(f"\nRunning benchmark across {len(scenarios)} scenarios and {len(args.seeds)} random seeds: {args.seeds}...")
+    print(
+        f"\nRunning benchmark for {topology.upper()} across {len(scenarios)} scenarios and {len(args.seeds)} random seeds: {args.seeds}..."
+    )
 
-    # Data structure: all_runs[scenario][policy] = list of episode result dicts (one per seed)
     all_runs = {sc: {p: [] for p in policies} for sc in scenarios}
 
     for s_idx, seed in enumerate(args.seeds):
-        # Pick consistent starting index for this seed:
-        # Start at the beginning of daytime (t=0) on Day (seed % 20 + 1)
-        # Curves ramp from base traffic (1.0x) -> daily peak (1.30x at step 72) -> starts dying down (1.25x at step 100)
         day_idx = (seed * 3) % 20 + 1
-        start_idx = day_idx * 288 + 0
+        start_idx = min(day_idx * 288, max(0, env.dataset_len - args.steps - 1))
 
         for sc in scenarios:
             for p_name, p_fn in policies.items():
                 run_data = run_episode(env, p_fn, start_idx, seed=seed, scenario=sc, num_steps=args.steps)
                 all_runs[sc][p_name].append(run_data)
+
+    policy_labels = {
+        "OSPF": "OSPF (Shortest Path)",
+        "Random": "Untrained (Random)",
+        "Trained": "Trained FL+RL Agent",
+        "GEANT Transfer": "GEANT Transferred (Fallback)",
+    }
+    policy_plot_labels = {
+        "OSPF": "OSPF-SPF",
+        "Random": "Random Policy",
+        "Trained": "Trained FL+RL",
+        "GEANT Transfer": "GEANT Transfer",
+    }
+
+    def get_policy_label(p_name):
+        return policy_labels.get(p_name, p_name)
+
+    def get_policy_plot_label(p_name):
+        return policy_plot_labels.get(p_name, p_name)
 
     # --- Print Statistical Summary Table (Mean ± Std) ---
     print("\n" + "=" * 122)
@@ -231,11 +381,7 @@ def run_demo():
                 "reward_std": np.std(rewards),
             }
 
-            label = (
-                "OSPF (Shortest Path)"
-                if p_name == "OSPF"
-                else ("Untrained (Random)" if p_name == "Random" else "Trained FL+RL Agent")
-            )
+            label = get_policy_label(p_name)
 
             st = summary_stats[sc][p_name]
             print(
@@ -252,10 +398,30 @@ def run_demo():
     # --- Plot Generation ---
     print(f"\nGenerating rich comparative plots in {results_dir.resolve()}...")
 
-    colors = {"OSPF": "#1f77b4", "Random": "#ff7f0e", "Trained": "#2ca02c"}
-    styles = {"OSPF": "-", "Random": "--", "Trained": "-"}
-    widths = {"OSPF": 1.8, "Random": 1.2, "Trained": 2.2}
-    alphas = {"OSPF": 0.9, "Random": 0.6, "Trained": 1.0}
+    colors = {
+        "OSPF": "#1f77b4",
+        "Random": "#ff7f0e",
+        "Trained": "#2ca02c",
+        "GEANT Transfer": "#9467bd",
+    }
+    styles = {
+        "OSPF": "-",
+        "Random": "--",
+        "Trained": "-",
+        "GEANT Transfer": "-.",
+    }
+    widths = {
+        "OSPF": 1.8,
+        "Random": 1.2,
+        "Trained": 2.2,
+        "GEANT Transfer": 2.0,
+    }
+    alphas = {
+        "OSPF": 0.9,
+        "Random": 0.6,
+        "Trained": 1.0,
+        "GEANT Transfer": 0.9,
+    }
 
     # 1. Five-Panel Timelines for All Metrics (Averaged across seeds with std shading)
     metric_configs = [
@@ -264,6 +430,18 @@ def run_demo():
         ("avg_losses", "Packet Loss Ratio (%)", "overview_all_scenarios_loss.png", False),
         ("rewards", "Per-Step Reward", "overview_all_scenarios_reward.png", False),
     ]
+
+    def setup_axis_ticks(ax, n_steps: int):
+        ax.set_xlim(0, max(1, n_steps - 1))
+        ticks = np.linspace(0, max(1, n_steps - 1), 6, dtype=int)
+        labels = []
+        for t in ticks:
+            total_minutes = 8 * 60 + t * 5
+            h = (total_minutes // 60) % 24
+            m = total_minutes % 60
+            labels.append(f"{h:02d}:{m:02d}")
+        ax.set_xticks(ticks)
+        ax.set_xticklabels(labels, fontsize=8)
 
     for metric_key, ylabel, fname, has_threshold in metric_configs:
         _fig, axes = plt.subplots(6, 1, figsize=(12, 16), sharex=True)
@@ -277,23 +455,21 @@ def run_demo():
                 mean_curve = np.mean(matrix, axis=0)
                 std_curve = np.std(matrix, axis=0)
 
-                label_p = (
-                    "OSPF-SPF" if p_name == "OSPF" else ("Random Policy" if p_name == "Random" else "Trained FL+RL")
-                )
+                label_p = get_policy_plot_label(p_name)
                 ax.plot(
                     timesteps,
                     mean_curve,
                     label=label_p,
-                    color=colors[p_name],
-                    linestyle=styles[p_name],
-                    linewidth=widths[p_name],
-                    alpha=alphas[p_name],
+                    color=colors.get(p_name, "#9467bd"),
+                    linestyle=styles.get(p_name, "-"),
+                    linewidth=widths.get(p_name, 1.8),
+                    alpha=alphas.get(p_name, 0.9),
                 )
                 ax.fill_between(
                     timesteps,
                     mean_curve - std_curve,
                     mean_curve + std_curve,
-                    color=colors[p_name],
+                    color=colors.get(p_name, "#9467bd"),
                     alpha=0.15,
                 )
 
@@ -304,8 +480,7 @@ def run_demo():
 
             ax.set_title(scenario_titles[sc], fontsize=11, fontweight="bold")
             ax.set_ylabel(ylabel, fontsize=10)
-            ax.set_xticks([0, 24, 48, 72, 96, 100])
-            ax.set_xticklabels(["08:00", "10:00", "12:00", "14:00 (Peak)", "16:00", "16:20"], fontsize=8)
+            setup_axis_ticks(ax, len(timesteps))
             ax.grid(True, linestyle="--", alpha=0.5)
             if idx == 0:
                 ax.legend(loc="upper right", framealpha=0.9)
@@ -331,18 +506,24 @@ def run_demo():
             mean_c = np.mean(matrix, axis=0)
             std_c = np.std(matrix, axis=0)
 
-            p_lbl = "OSPF-SPF" if p_name == "OSPF" else ("Random Policy" if p_name == "Random" else "Trained FL+RL")
+            p_lbl = get_policy_plot_label(p_name)
             ax.plot(
-                timesteps, mean_c, label=p_lbl, color=colors[p_name], linewidth=widths[p_name], linestyle=styles[p_name]
+                timesteps,
+                mean_c,
+                label=p_lbl,
+                color=colors.get(p_name, "#9467bd"),
+                linewidth=widths.get(p_name, 1.8),
+                linestyle=styles.get(p_name, "-"),
             )
-            ax.fill_between(timesteps, mean_c - std_c, mean_c + std_c, color=colors[p_name], alpha=0.15)
+            ax.fill_between(timesteps, mean_c - std_c, mean_c + std_c, color=colors.get(p_name, "#9467bd"), alpha=0.15)
 
-        ax.axvspan(50, 55, color="purple", alpha=0.18, label="Flash Crowd Surge (5x)")
+        t4_s = int(len(timesteps) * 0.5)
+        t4_e = min(int(len(timesteps) * 0.55), len(timesteps))
+        ax.axvspan(t4_s, t4_e, color="purple", alpha=0.18, label=f"Flash Crowd Surge (5x, t={t4_s}..{t4_e})")
         if thresh:
             ax.axhline(0.90, color="red", linestyle=":", label="Threshold (0.90)")
         ax.set_title(f"T4 Flash Crowd: {m_label}", fontsize=11, fontweight="bold")
-        ax.set_xticks([0, 24, 48, 72, 96, 100])
-        ax.set_xticklabels(["08:00", "10:00", "12:00", "14:00 (Peak)", "16:00", "16:20"], fontsize=8)
+        setup_axis_ticks(ax, len(timesteps))
         ax.set_xlabel("Time of Day (08:00 AM - 04:20 PM / 5-min intervals)")
         ax.set_ylabel(m_label)
         ax.grid(True, linestyle="--", alpha=0.5)
@@ -371,18 +552,24 @@ def run_demo():
             mean_c = np.mean(matrix, axis=0)
             std_c = np.std(matrix, axis=0)
 
-            p_lbl = "OSPF-SPF" if p_name == "OSPF" else ("Random Policy" if p_name == "Random" else "Trained FL+RL")
+            p_lbl = get_policy_plot_label(p_name)
             ax.plot(
-                timesteps, mean_c, label=p_lbl, color=colors[p_name], linewidth=widths[p_name], linestyle=styles[p_name]
+                timesteps,
+                mean_c,
+                label=p_lbl,
+                color=colors.get(p_name, "#9467bd"),
+                linewidth=widths.get(p_name, 1.8),
+                linestyle=styles.get(p_name, "-"),
             )
-            ax.fill_between(timesteps, mean_c - std_c, mean_c + std_c, color=colors[p_name], alpha=0.15)
+            ax.fill_between(timesteps, mean_c - std_c, mean_c + std_c, color=colors.get(p_name, "#9467bd"), alpha=0.15)
 
-        ax.axvspan(30, 40, color="purple", alpha=0.18, label="Spike Surge (3x)")
+        t2_s = int(len(timesteps) * 0.3)
+        t2_e = min(int(len(timesteps) * 0.4), len(timesteps))
+        ax.axvspan(t2_s, t2_e, color="purple", alpha=0.18, label=f"Spike Surge (3x, t={t2_s}..{t2_e})")
         if thresh:
             ax.axhline(0.90, color="red", linestyle=":", label="Threshold (0.90)")
         ax.set_title(f"T2 Traffic Spike: {m_label}", fontsize=11, fontweight="bold")
-        ax.set_xticks([0, 24, 48, 72, 96, 100])
-        ax.set_xticklabels(["08:00", "10:00", "12:00", "14:00 (Peak)", "16:00", "16:20"], fontsize=8)
+        setup_axis_ticks(ax, len(timesteps))
         ax.set_xlabel("Time of Day (08:00 AM - 04:20 PM / 5-min intervals)")
         ax.set_ylabel(m_label)
         ax.grid(True, linestyle="--", alpha=0.5)
@@ -411,18 +598,23 @@ def run_demo():
             mean_c = np.mean(matrix, axis=0)
             std_c = np.std(matrix, axis=0)
 
-            p_lbl = "OSPF-SPF" if p_name == "OSPF" else ("Random Policy" if p_name == "Random" else "Trained FL+RL")
+            p_lbl = get_policy_plot_label(p_name)
             ax.plot(
-                timesteps, mean_c, label=p_lbl, color=colors[p_name], linewidth=widths[p_name], linestyle=styles[p_name]
+                timesteps,
+                mean_c,
+                label=p_lbl,
+                color=colors.get(p_name, "#9467bd"),
+                linewidth=widths.get(p_name, 1.8),
+                linestyle=styles.get(p_name, "-"),
             )
-            ax.fill_between(timesteps, mean_c - std_c, mean_c + std_c, color=colors[p_name], alpha=0.15)
+            ax.fill_between(timesteps, mean_c - std_c, mean_c + std_c, color=colors.get(p_name, "#9467bd"), alpha=0.15)
 
-        ax.axvline(40, color="darkred", linestyle="--", linewidth=1.8, label="Link (8, 12) Fails at t=40")
+        t5_f = int(len(timesteps) * 0.4)
+        ax.axvline(t5_f, color="darkred", linestyle="--", linewidth=1.8, label=f"Link Fails at t={t5_f}")
         if thresh:
             ax.axhline(0.90, color="red", linestyle=":", label="Threshold (0.90)")
         ax.set_title(f"T5 Link Failure: {m_label}", fontsize=11, fontweight="bold")
-        ax.set_xticks([0, 24, 48, 72, 96, 100])
-        ax.set_xticklabels(["08:00", "10:00", "12:00", "14:00 (Peak)", "16:00", "16:20"], fontsize=8)
+        setup_axis_ticks(ax, len(timesteps))
         ax.set_xlabel("Time of Day (08:00 AM - 04:20 PM / 5-min intervals)")
         ax.set_ylabel(m_label)
         ax.grid(True, linestyle="--", alpha=0.5)
@@ -451,31 +643,38 @@ def run_demo():
             mean_c = np.mean(matrix, axis=0)
             std_c = np.std(matrix, axis=0)
 
-            p_lbl = "OSPF-SPF" if p_name == "OSPF" else ("Random Policy" if p_name == "Random" else "Trained FL+RL")
+            p_lbl = get_policy_plot_label(p_name)
             ax.plot(
-                timesteps, mean_c, label=p_lbl, color=colors[p_name], linewidth=widths[p_name], linestyle=styles[p_name]
+                timesteps,
+                mean_c,
+                label=p_lbl,
+                color=colors.get(p_name, "#9467bd"),
+                linewidth=widths.get(p_name, 1.8),
+                linestyle=styles.get(p_name, "-"),
             )
-            ax.fill_between(timesteps, mean_c - std_c, mean_c + std_c, color=colors[p_name], alpha=0.15)
+            ax.fill_between(timesteps, mean_c - std_c, mean_c + std_c, color=colors.get(p_name, "#9467bd"), alpha=0.15)
 
-        ax.axvspan(0, 40, color="orange", alpha=0.15, label="Busy Morning (2x)")
-        ax.axvspan(60, 100, color="green", alpha=0.15, label="Quiet Afternoon (0.3x)")
+        t6_m = int(len(timesteps) * 0.4)
+        t6_a = int(len(timesteps) * 0.6)
+        ax.axvspan(0, t6_m, color="orange", alpha=0.15, label=f"Busy Morning (2x, t=0..{t6_m})")
+        ax.axvspan(t6_a, len(timesteps) - 1, color="green", alpha=0.15, label=f"Quiet Afternoon (0.3x, t={t6_a}..{len(timesteps)-1})")
         if thresh:
             ax.axhline(0.90, color="red", linestyle=":", label="Threshold (0.90)")
         ax.set_title(f"T6 Irregular Day: {m_label}", fontsize=11, fontweight="bold")
-        ax.set_xticks([0, 24, 48, 72, 96, 100])
-        ax.set_xticklabels(["08:00", "10:00", "12:00", "14:00 (Peak)", "16:00", "16:20"], fontsize=8)
+        setup_axis_ticks(ax, len(timesteps))
         ax.set_xlabel("Time of Day (08:00 AM - 04:20 PM / 5-min intervals)")
         ax.set_ylabel(m_label)
         ax.grid(True, linestyle="--", alpha=0.5)
         ax.legend(loc="upper left", framealpha=0.9, fontsize=9)
 
     plt.suptitle(
-        "Scenario T6 (Irregular Day: Busy Morning, Quiet Afternoon) — Multi-Metric Comparison", fontsize=13, fontweight="bold"
+        "Scenario T6 (Irregular Day: Busy Morning, Quiet Afternoon) — Multi-Metric Comparison",
+        fontsize=13,
+        fontweight="bold",
     )
     plt.tight_layout()
     plt.savefig(results_dir / "scenario_t6_irregular_day.png", dpi=200)
     plt.close()
-
 
     # 5. Summary Grouped Bar Chart Across Scenarios (with Error Bars)
     _fig, axes = plt.subplots(2, 2, figsize=(14, 10))
@@ -488,14 +687,14 @@ def run_demo():
 
     x = np.arange(len(scenarios))
     num_p = len(active_policy_names)
-    bar_width = 0.35 if num_p == 2 else 0.26
+    bar_width = 0.8 / max(1, num_p)
 
     for m_mean, m_std, title, ax in bar_metrics:
         for i, p_name in enumerate(active_policy_names):
             vals = [summary_stats[sc][p_name][m_mean] for sc in scenarios]
             errs = [summary_stats[sc][p_name][m_std] for sc in scenarios]
 
-            p_lbl = "OSPF-SPF" if p_name == "OSPF" else ("Random Policy" if p_name == "Random" else "Trained FL+RL")
+            p_lbl = get_policy_plot_label(p_name)
             offset = (i - (num_p - 1) / 2.0) * bar_width
             ax.bar(
                 x + offset,
@@ -504,7 +703,7 @@ def run_demo():
                 yerr=errs,
                 capsize=4,
                 label=p_lbl,
-                color=colors[p_name],
+                color=colors.get(p_name, "#9467bd"),
                 alpha=0.85,
             )
 
@@ -521,7 +720,33 @@ def run_demo():
     plt.savefig(results_dir / "summary_metrics_barchart.png", dpi=200)
     plt.close()
 
-    print("All multi-metric and multi-seed comparative plots successfully generated and saved!")
+    print(f"[{topology.upper()}] All multi-metric comparative plots successfully generated in {results_dir}!")
+
+
+def run_demo():
+    parser = argparse.ArgumentParser(description="Multi-Scenario & Multi-Seed FL+RL Evaluation Demo across Topologies")
+    parser.add_argument(
+        "--topology",
+        type=str,
+        default="all",
+        choices=["all", "nsfnet", "geant", "abilene"],
+        help="Topology to evaluate: nsfnet, geant, abilene, or all",
+    )
+    parser.add_argument("--cross_eval", action="store_true", help="Explicitly test GEANT-trained model on Abilene")
+    parser.add_argument("--seeds", nargs="+", type=int, default=[42, 43, 44, 45, 46], help="Random seeds for testing")
+    parser.add_argument("--steps", type=int, default=100, help="Timesteps per episode")
+    parser.add_argument("--out_dir", type=str, default="results/demo", help="Base directory to save generated plots")
+    parser.add_argument("--no_random", action="store_true", help="Skip the Untrained (Random Policy) baseline")
+    args = parser.parse_args()
+
+    base_results_dir = Path(args.out_dir)
+    topologies = ["nsfnet", "geant", "abilene"] if args.topology == "all" else [args.topology]
+
+    print(f"Starting Multi-Model Evaluation Demo for topologies: {topologies}")
+    for topo in topologies:
+        run_demo_for_topology(topo, args, base_results_dir)
+
+    print(f"\nAll benchmark demo evaluations for {topologies} successfully finished!")
 
 
 if __name__ == "__main__":

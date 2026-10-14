@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import Optional
+
 import json
 import os
 import sys
@@ -29,7 +29,7 @@ MAX_F_IN = 7
 
 
 class DomainPredictor:
-    def __init__(self, fl_model_path: str, data_dir: Optional[str] = None):
+    def __init__(self, fl_model_path: str, data_dir: str | None = None):
         if data_dir is None:
             data_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "../data/preprocessed"))
         self.models = {}
@@ -50,20 +50,23 @@ class DomainPredictor:
                 self.max_f_in = state_dict["fc.weight"].shape[0] // (3 * 64)
 
             self.active = True
+            self.shared_model = create_model(f_in=self.max_f_in)
+            self.shared_model.load_state_dict(state_dict)
+            self.shared_model.eval()
 
             for domain_id in [0, 1, 2]:
                 idx_path = os.path.join(data_dir, f"domain_{domain_id}_edge_indices.json")
                 if os.path.exists(idx_path):
                     with open(idx_path) as f:
                         self.domain_indices[domain_id] = json.load(f)
+                    self.models[domain_id] = self.shared_model
 
-                    model = create_model(f_in=self.max_f_in)
-                    model.load_state_dict(state_dict)
-                    model.eval()
-                    self.models[domain_id] = model
-                else:
-                    print(f"Warning: Domain {domain_id} indices not found.")
-                    self.active = False
+            if not self.domain_indices:
+                print(f"Warning: No domain edge indices found in {data_dir}.")
+                self.active = False
+            else:
+                self.domain_list = sorted(self.domain_indices.keys())
+                self.batch_x = torch.zeros((len(self.domain_list), 12, self.max_f_in), dtype=torch.float32)
         except (RuntimeError, ValueError, KeyError, OSError, json.JSONDecodeError) as e:
             print(f"Failed to load FL model or domain info: {e}")
             self.active = False
@@ -74,45 +77,54 @@ class DomainPredictor:
 
         pred = np.zeros(num_edges, dtype=np.float32)
         with torch.no_grad():
-            for domain_id, indices in self.domain_indices.items():
-                domain_hist = history_buffer[:, indices]  # shape: (12, F_in)
-                f_in = len(indices)
+            for d_idx, domain_id in enumerate(self.domain_list):
+                indices = self.domain_indices[domain_id]
+                f_in = min(len(indices), self.max_f_in)
+                self.batch_x[d_idx, :, :f_in] = torch.from_numpy(history_buffer[:, indices[:f_in]])
                 if f_in < self.max_f_in:
-                    pad = np.zeros((history_buffer.shape[0], self.max_f_in - f_in), dtype=np.float32)
-                    domain_hist = np.concatenate([domain_hist, pad], axis=1)
-                elif f_in > self.max_f_in:
-                    domain_hist = domain_hist[:, : self.max_f_in]
+                    self.batch_x[d_idx, :, f_in:] = 0.0
 
-                x = torch.tensor(domain_hist, dtype=torch.float32).unsqueeze(0)  # (1, 12, max_f_in)
-                y = self.models[domain_id](x)  # (1, 3, max_f_in)
+            batch_y = self.shared_model(self.batch_x)
+            batch_pred = batch_y[:, 0, :].numpy()
 
-                # We want t+1 prediction -> y[0, 0, :min(f_in, self.max_f_in)]
-                valid_len = min(f_in, self.max_f_in)
-                domain_pred = y[0, 0, :valid_len].numpy()
-
-                # Map back to full edge array.
-                # Note: multiple domains might predict the same edge (cross-domain).
-                # We can average them, or just let the last one overwrite. Averaging is safer.
-                for i, idx in enumerate(indices):
-                    if pred[idx] == 0:
-                        pred[idx] = domain_pred[i]
-                    else:
-                        pred[idx] = (pred[idx] + domain_pred[i]) / 2.0
+            for d_idx, domain_id in enumerate(self.domain_list):
+                indices = self.domain_indices[domain_id]
+                f_in = min(len(indices), self.max_f_in)
+                for i in range(f_in):
+                    idx = indices[i]
+                    if idx < num_edges:
+                        val = float(batch_pred[d_idx, i])
+                        if pred[idx] == 0:
+                            pred[idx] = val
+                        else:
+                            pred[idx] = (pred[idx] + val) * 0.5
 
         return pred
 
 
-class NSFNETRoutingEnv(gym.Env):
+class NetworkRoutingEnv(gym.Env):
     """
-    Lightweight Network Simulator (Gym Environment) for RL Traffic Engineering.
-    Spec: §6
+    Generalized Network Simulator (Gym Environment) for RL Traffic Engineering.
+    Supports pluggable topologies (NSFNET, GÉANT, Abilene) and dynamic managed OD pairs.
     """
 
     metadata = {"render_modes": ["console"]}
 
-    def __init__(self, topo_path: str, tm_path: str, fl_model_path: Optional[str] = None, surge_prob: float = 0.0):
+    def __init__(
+        self,
+        topo_path: str = "data/nsfnet_topology.json",
+        tm_path: str = "data/generated/traffic_matrices.npy",
+        fl_model_path: str | None = None,
+        domain_data_dir: str | None = None,
+        num_managed_od: int | None = None,
+        surge_prob: float = 0.0,
+        link_fail_prob: float = 0.0,
+    ):
         super().__init__()
         self.surge_prob = surge_prob
+        self.link_fail_prob = link_fail_prob
+        self.topo_path = topo_path
+        self.tm_path = tm_path
 
         # --- 1. Load Topology ---
         self.topology = nx.DiGraph()
@@ -133,23 +145,23 @@ class NSFNETRoutingEnv(gym.Env):
             self.edges.append((u, v))
             self.edges.append((v, u))
 
-        # Keep consistent edge ordering (42 directed links)
+        # Keep consistent edge ordering
         self.edges = sorted(self.topology.edges())
         self.edge_to_idx = {e: i for i, e in enumerate(self.edges)}
         self.num_edges = len(self.edges)
 
         # --- 2. Load Traffic Matrices ---
-        # Shape: (8064, 14, 14)
         if os.path.exists(tm_path):
             self.tm_data = np.load(tm_path)
         else:
-            print(f"Warning: TM data not found at {tm_path}. Using random mock data.")
-            self.tm_data = np.random.rand(8064, 14, 14) * 2.0  # Mbps
+            num_nodes = len(topo_data["nodes"])
+            print(f"Warning: TM data not found at {tm_path}. Generating default mock data.")
+            self.tm_data = np.random.rand(1000, num_nodes, num_nodes) * 2.0  # Mbps
 
         self.num_nodes = self.tm_data.shape[1]
         self.dataset_len = self.tm_data.shape[0]
 
-        # Find top 20 OD pairs by average traffic
+        # Determine managed OD pairs dynamically
         avg_tm = np.mean(self.tm_data, axis=0)
         od_pairs = []
         for i in range(self.num_nodes):
@@ -158,8 +170,19 @@ class NSFNETRoutingEnv(gym.Env):
                     od_pairs.append((i, j, avg_tm[i, j]))
 
         od_pairs.sort(key=lambda x: x[2], reverse=True)
-        self.managed_od_pairs = [(u, v) for u, v, _ in od_pairs[:20]]
-        self.unmanaged_od_pairs = [(u, v) for u, v, _ in od_pairs[20:]]
+
+        if num_managed_od is not None:
+            target_managed = min(num_managed_od, len(od_pairs))
+        else:
+            if self.num_nodes == 22:
+                target_managed = min(30, len(od_pairs))
+            elif self.num_nodes == 12:
+                target_managed = min(15, len(od_pairs))
+            else:
+                target_managed = min(20, len(od_pairs))
+
+        self.managed_od_pairs = [(u, v) for u, v, _ in od_pairs[:target_managed]]
+        self.unmanaged_od_pairs = [(u, v) for u, v, _ in od_pairs[target_managed:]]
         self.num_managed = len(self.managed_od_pairs)
 
         # --- 3. Pre-compute K=3 shortest paths ---
@@ -171,20 +194,21 @@ class NSFNETRoutingEnv(gym.Env):
         # Calculate maximum possible demand for normalization
         self.d_max = np.max(self.tm_data) if np.max(self.tm_data) > 0 else 1.0
 
-        # Calculate realistic delay normalization scale (baseline propagation delay ~10ms -> scale ~30ms)
+        # Calculate realistic delay normalization scale
         prop_delays = []
         for u, v in self.managed_od_pairs:
             p0 = self.path_table[(u, v)][0]
-            d = sum(self.topology[p0[i]][p0[i + 1]]["delay"] for i in range(len(p0) - 1))
-            prop_delays.append(d)
+            if len(p0) > 1:
+                d = sum(self.topology[p0[i]][p0[i + 1]]["delay"] for i in range(len(p0) - 1))
+                prop_delays.append(d)
         self.base_delay = float(np.mean(prop_delays)) if prop_delays else 10.0
         self.max_delay_norm = max(self.base_delay * 3.0, 30.0)
 
         # --- 4. Define Spaces ---
-        # State: num_edges (util) + num_edges (predicted util) + num_managed (demands)
+        # State: num_edges (current util) + num_edges (predicted util) + num_managed (demands)
         obs_dim = self.num_edges * 2 + self.num_managed
         self.observation_space = spaces.Box(low=0.0, high=1.0, shape=(obs_dim,), dtype=np.float32)
-        # Action: 20 choices of 3 paths
+        # Action: num_managed choices of K paths
         self.action_space = spaces.MultiDiscrete([self.K] * self.num_managed)
 
         # --- 5. State Variables ---
@@ -195,7 +219,15 @@ class NSFNETRoutingEnv(gym.Env):
         self.last_action = np.zeros(self.num_managed, dtype=np.int32)
 
         # Load FL model
-        self.fl_model = DomainPredictor(fl_model_path) if fl_model_path else None
+        if domain_data_dir is None:
+            if "geant" in topo_path.lower():
+                domain_data_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "../data/preprocessed_geant"))
+            elif "abilene" in topo_path.lower():
+                domain_data_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "../data/preprocessed_abilene"))
+            else:
+                domain_data_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "../data/preprocessed"))
+
+        self.fl_model = DomainPredictor(fl_model_path, data_dir=domain_data_dir) if fl_model_path else None
 
     def _recompute_paths(self):
         G_filtered = self.topology.copy()
@@ -227,7 +259,7 @@ class NSFNETRoutingEnv(gym.Env):
         self.disabled_links.add((v, u))
         self._recompute_paths()
 
-    def enable_link(self, u: int, v: int, capacity: Optional[float] = None, delay: Optional[float] = None):
+    def enable_link(self, u: int, v: int, capacity: float | None = None, delay: float | None = None):
         self.disabled_links.discard((u, v))
         self.disabled_links.discard((v, u))
         self._recompute_paths()
@@ -235,8 +267,20 @@ class NSFNETRoutingEnv(gym.Env):
     def set_link_failure(self, u: int, v: int, failure_step: int):
         self.scheduled_failures.append((failure_step, u, v))
 
-    def reset(self, seed: Optional[int] = None, options: Optional[dict] = None) -> tuple[np.ndarray, dict]:
+    def reset(self, seed: int | None = None, options: dict | None = None) -> tuple[np.ndarray, dict]:
         super().reset(seed=seed)
+
+        # Clear any disabled links from previous episode
+        if self.disabled_links:
+            self.disabled_links = set()
+            self._recompute_paths()
+        self.scheduled_failures = []
+
+        if self.link_fail_prob > 0.0 and self.np_random.random() < self.link_fail_prob:
+            fail_step = int(self.np_random.integers(15, 45))
+            edge_idx = int(self.np_random.integers(0, min(10, self.num_edges)))
+            u, v = self.edges[edge_idx]
+            self.set_link_failure(u, v, fail_step)
 
         # Random starting point in the dataset (ensuring room for EPISODE_LENGTH)
         # Use only training split ideally, but for simplicity pick any valid offset
@@ -380,12 +424,15 @@ class NSFNETRoutingEnv(gym.Env):
         avg_delay_norm = min(avg_delay / self.max_delay_norm, 1.0)
         avg_loss = total_loss / self.num_managed
 
+        # Excess delay penalty (discourages unnecessary multi-hop detours under normal load)
+        excess_delay = max(0.0, avg_delay - self.base_delay) / self.base_delay if self.base_delay > 0 else 0.0
+
         # h. Compute reward
         mlu = np.max(self.link_utils)
         action_churn = float(np.mean(action != self.last_action))
         self.last_action = action.copy()
         churn_penalty = 0.1 * action_churn
-        reward = -(1.0 * mlu + 0.5 * avg_delay_norm + 2.0 * avg_loss + churn_penalty)
+        reward = -(1.0 * mlu + 0.5 * avg_delay_norm + 0.5 * excess_delay + 5.0 * avg_loss + churn_penalty)
 
         # i. Check done
         all_congested = np.all(self.link_utils > 0.95)
@@ -400,6 +447,10 @@ class NSFNETRoutingEnv(gym.Env):
         }
 
         return obs, float(reward), done, truncated, info
+
+
+# Backward-compatible alias
+NSFNETRoutingEnv = NetworkRoutingEnv
 
 
 if __name__ == "__main__":

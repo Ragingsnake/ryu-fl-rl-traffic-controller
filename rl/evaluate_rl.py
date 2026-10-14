@@ -199,7 +199,11 @@ def run_evaluations(args: argparse.Namespace):
     model = None
     if PPO is not None and os.path.exists(rl_model_path):
         try:
-            model = PPO.load(rl_model_path)
+            custom_objects = {
+                "lr_schedule": lambda _: 0.0,
+                "learning_rate": 0.0,
+            }
+            model = PPO.load(rl_model_path, custom_objects=custom_objects)
             print(f"Loaded RL model from {rl_model_path}")
         except (RuntimeError, ValueError, OSError) as e:
             print(f"Failed to load RL model: {e}")
@@ -339,7 +343,10 @@ def plot_evaluation_charts(df_summary: pd.DataFrame, output_dir: str = "results/
         for i, baseline in enumerate(baselines):
             sub = df_summary[df_summary["Baseline"] == baseline]
             # Match scenarios in order
-            vals = [sub[sub["Scenario"] == s][col_name].values[0] if len(sub[sub["Scenario"] == s]) > 0 else 0 for s in scenarios]
+            vals = [
+                sub[sub["Scenario"] == s][col_name].values[0] if len(sub[sub["Scenario"] == s]) > 0 else 0
+                for s in scenarios
+            ]
             ax.bar(x + i * width, vals, width, label=baseline, color=colors[i % len(colors)], alpha=0.85)
 
         ax.set_xlabel("Scenario", fontsize=11, fontweight="bold")
