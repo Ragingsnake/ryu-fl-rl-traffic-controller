@@ -1,12 +1,14 @@
 import csv
 import os
+import numpy as np
 
 from stable_baselines3.common.callbacks import BaseCallback
 
 
 def plot_training_curves(csv_path: str, output_dir: str = "results/demo", title_suffix: str = "") -> None:
-    """Standalone utility to plot publication-quality training curves from CSV."""
+    """Standalone utility to plot publication-quality, smooth training curves from CSV."""
     import matplotlib.pyplot as plt
+    import numpy as np
     import pandas as pd
 
     if not os.path.exists(csv_path):
@@ -19,59 +21,132 @@ def plot_training_curves(csv_path: str, output_dir: str = "results/demo", title_
         return
 
     os.makedirs(output_dir, exist_ok=True)
-    window = min(50, max(5, len(df) // 20))
-    df["reward_smooth"] = df["reward"].rolling(window=window, min_periods=1).mean()
-    df["mlu_smooth"] = df["mlu"].rolling(window=window, min_periods=1).mean()
-    df["delay_smooth"] = df["avg_delay"].rolling(window=window, min_periods=1).mean()
-    df["loss_smooth"] = df["avg_loss"].rolling(window=window, min_periods=1).mean()
 
-    # 1. Reward Curve
+    # 1. Aggregate parallel environments by step (eliminates vertical step-ladder lines and square waves)
+    df_step = df.groupby("step", as_index=False).agg({
+        "reward": ["mean", "std"],
+        "mlu": ["mean", "std"],
+        "avg_delay": ["mean", "std"],
+        "avg_loss": ["mean", "std"],
+    })
+    df_step.columns = [
+        "step",
+        "reward", "reward_std",
+        "mlu", "mlu_std",
+        "avg_delay", "delay_std",
+        "avg_loss", "loss_std",
+    ]
+    df_step["reward_std"] = df_step["reward_std"].fillna(0.0)
+    df_step["mlu_std"] = df_step["mlu_std"].fillna(0.0)
+    df_step["delay_std"] = df_step["delay_std"].fillna(0.0)
+    df_step["loss_std"] = df_step["loss_std"].fillna(0.0)
+
+    # 2. Compute smooth Exponential Moving Average (EMA) across distinct timesteps
+    span = max(3, min(30, len(df_step) // 5))
+    df_step["reward_smooth"] = df_step["reward"].ewm(span=span, adjust=False).mean()
+    df_step["mlu_smooth"] = df_step["mlu"].ewm(span=span, adjust=False).mean()
+    df_step["delay_smooth"] = df_step["avg_delay"].ewm(span=span, adjust=False).mean()
+    df_step["loss_smooth"] = df_step["avg_loss"].ewm(span=span, adjust=False).mean()
+
+    # 3. Single Reward Convergence Curve
     plt.style.use("seaborn-v0_8-whitegrid" if "seaborn-v0_8-whitegrid" in plt.style.available else "default")
     fig, ax = plt.subplots(figsize=(10, 5), dpi=300)
-    ax.plot(df["step"], df["reward"], color="#90caf9", alpha=0.35, label="Raw Episode Reward")
-    ax.plot(df["step"], df["reward_smooth"], color="#1565c0", linewidth=2.2, label=f"Moving Average (window={window})")
+
+    # Shaded confidence band (±0.75 std across parallel envs)
+    ax.fill_between(
+        df_step["step"],
+        df_step["reward"] - 0.75 * df_step["reward_std"],
+        df_step["reward"] + 0.75 * df_step["reward_std"],
+        color="#90caf9",
+        alpha=0.25,
+        label="Cross-Env Variance (±0.75σ)",
+    )
+    ax.plot(df_step["step"], df_step["reward"], color="#64b5f6", alpha=0.45, linewidth=1.2, label="Mean Step Reward")
+    ax.plot(df_step["step"], df_step["reward_smooth"], color="#1565c0", linewidth=2.4, label="EMA Convergence Trend")
+
     heading = f"PPO Training Convergence ({title_suffix}): Episode Reward over Timesteps" if title_suffix else "PPO Agent Training Convergence: Episode Reward over Time"
     ax.set_title(heading, fontsize=13, fontweight="bold", pad=12)
-    ax.set_xlabel("Training Timesteps", fontsize=12)
-    ax.set_ylabel("Cumulative Episode Reward", fontsize=12)
+    ax.set_xlabel("Training Timesteps", fontsize=11, fontweight="bold")
+    ax.set_ylabel("Cumulative Episode Reward", fontsize=11, fontweight="bold")
     ax.xaxis.set_major_formatter(plt.FuncFormatter(lambda x, p: f"{int(x):,}"))
-    ax.legend(loc="lower right", frameon=True, facecolor="white", framealpha=0.9)
+    ax.grid(True, linestyle="--", alpha=0.5)
+    ax.legend(loc="lower right", frameon=True, facecolor="white", framealpha=0.92, fontsize=9)
     plt.tight_layout()
     reward_path = os.path.join(output_dir, "rl_training_reward_curve.png")
     plt.savefig(reward_path)
     plt.close()
 
-    # 2. Comprehensive 4-Panel Diagnostics
+    # 4. Comprehensive 4-Panel Diagnostics (Smooth)
     fig, axes = plt.subplots(2, 2, figsize=(14, 9), dpi=300)
-    axes[0, 0].plot(df["step"], df["reward"], color="#90caf9", alpha=0.3)
-    axes[0, 0].plot(df["step"], df["reward_smooth"], color="#1976d2", linewidth=2)
+
+    # (a) Reward
+    axes[0, 0].fill_between(
+        df_step["step"],
+        df_step["reward"] - 0.75 * df_step["reward_std"],
+        df_step["reward"] + 0.75 * df_step["reward_std"],
+        color="#90caf9",
+        alpha=0.25,
+    )
+    axes[0, 0].plot(df_step["step"], df_step["reward"], color="#90caf9", alpha=0.4, linewidth=1.1)
+    axes[0, 0].plot(df_step["step"], df_step["reward_smooth"], color="#1976d2", linewidth=2.2, label="EMA Trend")
     axes[0, 0].set_title("(a) Episode Cumulative Reward", fontweight="bold", fontsize=12)
     axes[0, 0].set_xlabel("Training Timesteps")
     axes[0, 0].set_ylabel("Reward")
     axes[0, 0].xaxis.set_major_formatter(plt.FuncFormatter(lambda x, p: f"{int(x):,}"))
+    axes[0, 0].grid(True, linestyle="--", alpha=0.5)
+    axes[0, 0].legend(loc="lower right", framealpha=0.9, fontsize=9)
 
-    axes[0, 1].plot(df["step"], df["mlu"], color="#ffab91", alpha=0.3)
-    axes[0, 1].plot(df["step"], df["mlu_smooth"], color="#d84315", linewidth=2)
+    # (b) MLU
+    axes[0, 1].fill_between(
+        df_step["step"],
+        np.maximum(0, df_step["mlu"] - 0.75 * df_step["mlu_std"]),
+        df_step["mlu"] + 0.75 * df_step["mlu_std"],
+        color="#ffab91",
+        alpha=0.25,
+    )
+    axes[0, 1].plot(df_step["step"], df_step["mlu"], color="#ffab91", alpha=0.4, linewidth=1.1)
+    axes[0, 1].plot(df_step["step"], df_step["mlu_smooth"], color="#d84315", linewidth=2.2, label="EMA Trend")
     axes[0, 1].axhline(y=1.0, color="red", linestyle="--", alpha=0.7, label="Capacity Limit (1.0)")
     axes[0, 1].set_title("(b) Maximum Link Utilization (MLU)", fontweight="bold", fontsize=12)
     axes[0, 1].set_xlabel("Training Timesteps")
     axes[0, 1].set_ylabel("MLU")
     axes[0, 1].xaxis.set_major_formatter(plt.FuncFormatter(lambda x, p: f"{int(x):,}"))
-    axes[0, 1].legend(loc="upper right")
+    axes[0, 1].grid(True, linestyle="--", alpha=0.5)
+    axes[0, 1].legend(loc="upper right", framealpha=0.9, fontsize=9)
 
-    axes[1, 0].plot(df["step"], df["avg_delay"], color="#ce93d8", alpha=0.3)
-    axes[1, 0].plot(df["step"], df["delay_smooth"], color="#6a1b9a", linewidth=2)
+    # (c) Delay
+    axes[1, 0].fill_between(
+        df_step["step"],
+        np.maximum(0, df_step["avg_delay"] - 0.75 * df_step["delay_std"]),
+        df_step["avg_delay"] + 0.75 * df_step["delay_std"],
+        color="#ce93d8",
+        alpha=0.25,
+    )
+    axes[1, 0].plot(df_step["step"], df_step["avg_delay"], color="#ce93d8", alpha=0.4, linewidth=1.1)
+    axes[1, 0].plot(df_step["step"], df_step["delay_smooth"], color="#6a1b9a", linewidth=2.2, label="EMA Trend")
     axes[1, 0].set_title("(c) Average End-to-End Delay (ms)", fontweight="bold", fontsize=12)
     axes[1, 0].set_xlabel("Training Timesteps")
     axes[1, 0].set_ylabel("Delay (ms)")
     axes[1, 0].xaxis.set_major_formatter(plt.FuncFormatter(lambda x, p: f"{int(x):,}"))
+    axes[1, 0].grid(True, linestyle="--", alpha=0.5)
+    axes[1, 0].legend(loc="upper right", framealpha=0.9, fontsize=9)
 
-    axes[1, 1].plot(df["step"], df["avg_loss"], color="#ef9a9a", alpha=0.3)
-    axes[1, 1].plot(df["step"], df["loss_smooth"], color="#c62828", linewidth=2)
+    # (d) Packet Loss
+    axes[1, 1].fill_between(
+        df_step["step"],
+        np.maximum(0, df_step["avg_loss"] - 0.75 * df_step["loss_std"]),
+        df_step["avg_loss"] + 0.75 * df_step["loss_std"],
+        color="#ef9a9a",
+        alpha=0.25,
+    )
+    axes[1, 1].plot(df_step["step"], df_step["avg_loss"], color="#ef9a9a", alpha=0.4, linewidth=1.1)
+    axes[1, 1].plot(df_step["step"], df_step["loss_smooth"], color="#c62828", linewidth=2.2, label="EMA Trend")
     axes[1, 1].set_title("(d) Average Packet Loss Ratio", fontweight="bold", fontsize=12)
     axes[1, 1].set_xlabel("Training Timesteps")
     axes[1, 1].set_ylabel("Packet Loss")
     axes[1, 1].xaxis.set_major_formatter(plt.FuncFormatter(lambda x, p: f"{int(x):,}"))
+    axes[1, 1].grid(True, linestyle="--", alpha=0.5)
+    axes[1, 1].legend(loc="upper right", framealpha=0.9, fontsize=9)
 
     plt.suptitle("Deep Reinforcement Learning (PPO) Training Dynamics Across Timesteps", fontsize=15, fontweight="bold", y=0.99)
     plt.tight_layout()

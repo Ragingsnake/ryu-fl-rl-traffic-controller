@@ -75,8 +75,11 @@ class DomainPredictor:
         pred = np.zeros(num_edges, dtype=np.float32)
         with torch.no_grad():
             for domain_id, indices in self.domain_indices.items():
-                domain_hist = history_buffer[:, indices]  # shape: (12, F_in)
-                f_in = len(indices)
+                valid_indices = [idx for idx in indices if idx < history_buffer.shape[1]]
+                if not valid_indices:
+                    continue
+                domain_hist = history_buffer[:, valid_indices]  # shape: (12, F_in)
+                f_in = len(valid_indices)
                 if f_in < self.max_f_in:
                     pad = np.zeros((history_buffer.shape[0], self.max_f_in - f_in), dtype=np.float32)
                     domain_hist = np.concatenate([domain_hist, pad], axis=1)
@@ -93,11 +96,12 @@ class DomainPredictor:
                 # Map back to full edge array.
                 # Note: multiple domains might predict the same edge (cross-domain).
                 # We can average them, or just let the last one overwrite. Averaging is safer.
-                for i, idx in enumerate(indices):
-                    if pred[idx] == 0:
-                        pred[idx] = domain_pred[i]
-                    else:
-                        pred[idx] = (pred[idx] + domain_pred[i]) / 2.0
+                for i, idx in enumerate(valid_indices[:valid_len]):
+                    if idx < num_edges:
+                        if pred[idx] == 0:
+                            pred[idx] = domain_pred[i]
+                        else:
+                            pred[idx] = (pred[idx] + domain_pred[i]) / 2.0
 
         return pred
 
