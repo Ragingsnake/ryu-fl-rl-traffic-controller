@@ -33,7 +33,9 @@ def main():
     parser.add_argument("--timesteps", type=int, default=2000000, help="Total timesteps to train")
     parser.add_argument("--n_envs", type=int, default=8, help="Number of parallel environments")
     parser.add_argument("--num_managed_od", type=int, default=None, help="Number of managed OD pairs")
-    parser.add_argument("--surge_prob", type=float, default=0.15, help="Probability of traffic surge during training")
+    parser.add_argument("--surge_prob", type=float, default=None, help="Probability of traffic surge during training (None = topology default)")
+    parser.add_argument("--ent_coef", type=float, default=None, help="Entropy exploration coefficient (None = topology default)")
+    parser.add_argument("--prior_bias", type=float, default=None, help="Prior bias towards Path 0 (None = topology default)")
     parser.add_argument("--fl_model_path", type=str, default=None, help="Path to FL predictor model")
     parser.add_argument("--model_save_path", type=str, default=None, help="Path to save trained RL model")
     parser.add_argument("--log_dir", type=str, default="results/logs", help="Directory for logs")
@@ -72,6 +74,22 @@ def main():
     fl_model_path = args.fl_model_path if args.fl_model_path is not None else default_fl
     save_path = args.model_save_path if args.model_save_path is not None else default_rl
 
+    # Topology-specific hyperparameter defaults
+    if topo == "nsfnet":
+        # NSFNET production configuration: strictly preserved
+        default_ent_coef = 0.0005
+        default_prior_bias = 2.0
+        default_surge_prob = 0.15
+    else:
+        # GEANT & Abilene: balanced exploration with gentle Path 0 prior for delay efficiency
+        default_ent_coef = 0.005
+        default_prior_bias = 0.2
+        default_surge_prob = 0.35
+
+    ent_coef = args.ent_coef if args.ent_coef is not None else default_ent_coef
+    prior_bias = args.prior_bias if args.prior_bias is not None else default_prior_bias
+    surge_prob = args.surge_prob if args.surge_prob is not None else default_surge_prob
+
     print(f"============================================================")
     print(f"Training PPO on Topology: {topo.upper()}")
     print(f"  Topology file:    {topo_path}")
@@ -80,6 +98,9 @@ def main():
     print(f"  Domain Data Dir:  {domain_data_dir}")
     print(f"  Managed OD pairs: {num_managed}")
     print(f"  Total Timesteps:  {args.timesteps}")
+    print(f"  Exploration Ent:  {ent_coef}")
+    print(f"  Prior Bias (P0):  {prior_bias}")
+    print(f"  Surge Prob:       {surge_prob}")
     print(f"  Output Model:     {save_path}")
     print(f"============================================================")
 
@@ -88,7 +109,7 @@ def main():
             topo_path=topo_path,
             tm_path=tm_path,
             fl_model_path=fl_model_path if os.path.exists(fl_model_path) else None,
-            surge_prob=args.surge_prob,
+            surge_prob=surge_prob,
             domain_data_dir=domain_data_dir,
             num_managed_od=num_managed,
         )
@@ -100,7 +121,14 @@ def main():
         print(f"SubprocVecEnv failed: {e}. Falling back to DummyVecEnv.")
         vec_env = make_vec_env(make_env, n_envs=args.n_envs, vec_env_cls=DummyVecEnv)
 
-    callback = MetricsCallback(log_dir=args.log_dir, verbose=1)
+    default_log_dir = os.path.join(args.log_dir, topo) if topo != "nsfnet" else args.log_dir
+    default_demo_dir = os.path.join("results/demo", topo) if topo != "nsfnet" else "results/demo"
+    callback = MetricsCallback(
+        log_dir=default_log_dir,
+        output_dir=default_demo_dir,
+        title_suffix=topo.upper(),
+        verbose=1,
+    )
 
     policy_kwargs = {"net_arch": {"pi": [256, 128], "vf": [256, 128]}}
 
@@ -122,7 +150,7 @@ def main():
         gamma=0.95,
         gae_lambda=0.95,
         clip_range=0.2,
-        ent_coef=0.0005,
+        ent_coef=ent_coef,
         vf_coef=0.5,
         max_grad_norm=0.5,
         policy_kwargs=policy_kwargs,
@@ -136,10 +164,10 @@ def main():
     with torch.no_grad():
         bias = model.policy.action_net.bias
         for i in range(num_managed):
-            bias[3 * i] = 2.0  # Path 0 (Shortest Path / OSPF prior)
+            bias[3 * i] = float(prior_bias)  # Path 0 (Shortest Path / OSPF prior)
             bias[3 * i + 1] = 0.0  # Path 1
             bias[3 * i + 2] = 0.0  # Path 2
-    print(f"Initialized policy head with prior bias towards Path 0 for {num_managed} managed OD pairs.")
+    print(f"Initialized policy head with prior bias {prior_bias:.2f} towards Path 0 for {num_managed} managed OD pairs.")
 
     try:
         import tqdm  # noqa: F401

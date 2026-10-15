@@ -4,7 +4,7 @@ import os
 from stable_baselines3.common.callbacks import BaseCallback
 
 
-def plot_training_curves(csv_path: str, output_dir: str = "results/demo") -> None:
+def plot_training_curves(csv_path: str, output_dir: str = "results/demo", title_suffix: str = "") -> None:
     """Standalone utility to plot publication-quality training curves from CSV."""
     import matplotlib.pyplot as plt
     import pandas as pd
@@ -30,7 +30,8 @@ def plot_training_curves(csv_path: str, output_dir: str = "results/demo") -> Non
     fig, ax = plt.subplots(figsize=(10, 5), dpi=300)
     ax.plot(df["step"], df["reward"], color="#90caf9", alpha=0.35, label="Raw Episode Reward")
     ax.plot(df["step"], df["reward_smooth"], color="#1565c0", linewidth=2.2, label=f"Moving Average (window={window})")
-    ax.set_title("PPO Agent Training Convergence: Episode Reward over Time", fontsize=14, fontweight="bold", pad=12)
+    heading = f"PPO Training Convergence ({title_suffix}): Episode Reward over Timesteps" if title_suffix else "PPO Agent Training Convergence: Episode Reward over Time"
+    ax.set_title(heading, fontsize=13, fontweight="bold", pad=12)
     ax.set_xlabel("Training Timesteps", fontsize=12)
     ax.set_ylabel("Cumulative Episode Reward", fontsize=12)
     ax.xaxis.set_major_formatter(plt.FuncFormatter(lambda x, p: f"{int(x):,}"))
@@ -86,11 +87,14 @@ class MetricsCallback(BaseCallback):
     Logs MLU, avg_delay, avg_loss, and reward per episode.
     """
 
-    def __init__(self, log_dir: str, verbose: int = 0):
+    def __init__(self, log_dir: str, output_dir: str = None, title_suffix: str = "", verbose: int = 0):
         super().__init__(verbose)
         self.log_dir = log_dir
+        self.output_dir = output_dir or os.path.join(os.path.dirname(self.log_dir), "demo")
+        self.title_suffix = title_suffix
         self.csv_path = os.path.join(self.log_dir, "training_metrics.csv")
         os.makedirs(self.log_dir, exist_ok=True)
+        os.makedirs(self.output_dir, exist_ok=True)
         self.episode_count = 0
 
     def _on_training_start(self) -> None:
@@ -130,8 +134,7 @@ class MetricsCallback(BaseCallback):
     def _on_training_end(self) -> None:
         """Automatically plot training curves when training completes."""
         try:
-            demo_dir = os.path.join(os.path.dirname(self.log_dir), "demo")
-            plot_training_curves(self.csv_path, demo_dir)
+            plot_training_curves(self.csv_path, self.output_dir, self.title_suffix)
         except Exception as e:
             if self.verbose > 0:
                 print(f"Warning: Failed to generate training plots: {e}")
