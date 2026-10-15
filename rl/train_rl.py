@@ -40,6 +40,7 @@ def main():
     parser.add_argument("--model_save_path", type=str, default=None, help="Path to save trained RL model")
     parser.add_argument("--log_dir", type=str, default="results/logs", help="Directory for logs")
     parser.add_argument("--model_dir", type=str, default="models", help="Directory to save model")
+    parser.add_argument("--recurrent", action="store_true", help="Use RecurrentPPO (MlpLstmPolicy) for temporal route stability")
     args = parser.parse_args()
 
     os.makedirs(args.log_dir, exist_ok=True)
@@ -79,9 +80,9 @@ def main():
     #    preventing policy freeze and enabling smooth ascending convergence from -115 to -65.
     # 2. Balanced entropy coefficient (0.002) supports exploration of candidate paths during surges.
     # 3. Controlled surge probability (0.25) provides frequent congestion events to learn rerouting.
-    default_ent_coef = 0.005
-    default_prior_bias = 0.2
-    default_surge_prob = 0.30
+    default_ent_coef = 0.001
+    default_prior_bias = 0.3
+    default_surge_prob = 0.25
 
     ent_coef = args.ent_coef if args.ent_coef is not None else default_ent_coef
     prior_bias = args.prior_bias if args.prior_bias is not None else default_prior_bias
@@ -137,23 +138,50 @@ def main():
         tb_log = None
 
     # Hyperparameters tuned for coordination, rapid updates, and low entropy
-    model = PPO(
-        "MlpPolicy",
-        vec_env,
-        learning_rate=linear_schedule(4e-4, 1e-4),
-        n_steps=128,
-        batch_size=64,
-        n_epochs=10,
-        gamma=0.95,
-        gae_lambda=0.95,
-        clip_range=0.2,
-        ent_coef=ent_coef,
-        vf_coef=0.5,
-        max_grad_norm=0.5,
-        policy_kwargs=policy_kwargs,
-        verbose=1,
-        tensorboard_log=tb_log,
-    )
+    if args.recurrent:
+        from sb3_contrib import RecurrentPPO
+
+        recurrent_policy_kwargs = {
+            "lstm_hidden_size": 128,
+            "n_lstm_layers": 1,
+            "shared_lstm": False,
+            "enable_critic_lstm": True,
+        }
+        model = RecurrentPPO(
+            "MlpLstmPolicy",
+            vec_env,
+            learning_rate=linear_schedule(3e-4, 1e-4),
+            n_steps=128,
+            batch_size=64,
+            n_epochs=10,
+            gamma=0.95,
+            gae_lambda=0.95,
+            clip_range=0.2,
+            ent_coef=ent_coef,
+            vf_coef=0.5,
+            max_grad_norm=0.5,
+            policy_kwargs=recurrent_policy_kwargs,
+            verbose=1,
+            tensorboard_log=tb_log,
+        )
+    else:
+        model = PPO(
+            "MlpPolicy",
+            vec_env,
+            learning_rate=linear_schedule(4e-4, 1e-4),
+            n_steps=128,
+            batch_size=64,
+            n_epochs=10,
+            gamma=0.95,
+            gae_lambda=0.95,
+            clip_range=0.2,
+            ent_coef=ent_coef,
+            vf_coef=0.5,
+            max_grad_norm=0.5,
+            policy_kwargs=policy_kwargs,
+            verbose=1,
+            tensorboard_log=tb_log,
+        )
 
     import torch
 

@@ -405,7 +405,7 @@ class NSFNETRoutingEnv(gym.Env):
         excess_delay = max(0.0, avg_delay - self.base_delay) / self.base_delay if self.base_delay > 0 else 0.0
         action_churn = float(np.mean(action != self.last_action))
         self.last_action = action.copy()
-        churn_penalty = 0.02 * action_churn
+        churn_penalty = 0.08 * action_churn
 
         reward = -(1.0 * mlu + 0.5 * avg_delay_norm + 0.3 * excess_delay + 3.0 * avg_loss + churn_penalty)
 

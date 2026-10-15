@@ -35,6 +35,8 @@ import matplotlib.pyplot as plt
 def run_episode(env, policy_fn, start_idx: int, seed: int, scenario: str = "T1", num_steps: int = 100):
     """Run an episode using the given policy function under a specific scenario and seed."""
     env.reset(seed=seed)
+    if hasattr(policy_fn, "reset"):
+        policy_fn.reset()
     env.time_index = start_idx
     obs = env._get_observation()
 
@@ -125,6 +127,13 @@ def run_episode(env, policy_fn, start_idx: int, seed: int, scenario: str = "T1",
 
 def make_transfer_policy(agent, src_edges: int, src_managed: int, with_ospf_fallback: bool = True):
     """Zero-shot transfer adapter for cross-topology evaluation with congestion-guarded fallback."""
+    is_rec = hasattr(agent, "policy") and hasattr(agent.policy, "lstm_actor")
+    lstm_state = [None]
+    ep_start = [True]
+
+    def reset_transfer():
+        lstm_state[0] = None
+        ep_start[0] = True
 
     def policy_fn(obs, env):
         n_e = env.num_edges
@@ -137,7 +146,17 @@ def make_transfer_policy(agent, src_edges: int, src_managed: int, with_ospf_fall
         padded[src_edges : src_edges + min(n_e, src_edges)] = obs[n_e : n_e + min(n_e, src_edges)]
         # 3. Demands
         padded[src_edges * 2 : src_edges * 2 + min(n_m, src_managed)] = obs[n_e * 2 : n_e * 2 + min(n_m, src_managed)]
-        raw_action, _ = agent.predict(padded, deterministic=True)
+
+        if is_rec:
+            raw_action, lstm_state[0] = agent.predict(
+                padded,
+                state=lstm_state[0],
+                episode_start=np.array([ep_start[0]]),
+                deterministic=True,
+            )
+            ep_start[0] = False
+        else:
+            raw_action, _ = agent.predict(padded, deterministic=True)
         raw_action = raw_action[:n_m]
 
         if not with_ospf_fallback:
@@ -171,6 +190,7 @@ def make_transfer_policy(agent, src_edges: int, src_managed: int, with_ospf_fall
 
         return final_action
 
+    policy_fn.reset = reset_transfer
     return policy_fn
 
 
@@ -247,21 +267,31 @@ def run_demo_for_topology(topology: str, args, base_results_dir: Path):
 
     trained_agent = None
     is_cross_eval = False
+    is_recurrent = False
     custom_objects = {
         "lr_schedule": lambda _: 0.0,
         "learning_rate": 0.0,
     }
     if os.path.exists(rl_model_path):
         try:
-            from stable_baselines3 import PPO
+            from sb3_contrib import RecurrentPPO
 
-            trained_agent = PPO.load(rl_model_path, custom_objects=custom_objects)
-            print(f"[{topology.upper()}] Loaded RL agent from {rl_model_path}.")
-            if topology == "abilene" and ("geant" in rl_model_path or "ppo_agent.zip" in rl_model_path):
-                is_cross_eval = True
-                print(f"[{topology.upper()}] Running CROSS-TOPOLOGY transfer evaluation (Source: {rl_model_path})!")
-        except Exception as e:
-            print(f"[{topology.upper()}] Warning: Failed to load RL agent ({e}).")
+            trained_agent = RecurrentPPO.load(rl_model_path, custom_objects=custom_objects)
+            is_recurrent = True
+            print(f"[{topology.upper()}] Loaded RecurrentPPO (MlpLstmPolicy) agent from {rl_model_path}.")
+        except Exception:
+            try:
+                from stable_baselines3 import PPO
+
+                trained_agent = PPO.load(rl_model_path, custom_objects=custom_objects)
+                is_recurrent = False
+                print(f"[{topology.upper()}] Loaded standard PPO agent from {rl_model_path}.")
+            except Exception as e:
+                print(f"[{topology.upper()}] Warning: Failed to load RL agent ({e}).")
+
+        if trained_agent is not None and topology == "abilene" and ("geant" in rl_model_path or "ppo_agent.zip" in rl_model_path):
+            is_cross_eval = True
+            print(f"[{topology.upper()}] Running CROSS-TOPOLOGY transfer evaluation (Source: {rl_model_path})!")
     else:
         print(f"[{topology.upper()}] RL agent {rl_model_path} not found. Running OSPF & Random baselines.")
 
@@ -278,9 +308,25 @@ def run_demo_for_topology(topology: str, args, base_results_dir: Path):
             src_managed = 30 if "geant" in rl_model_path else 20
             policy_trained = make_transfer_policy(trained_agent, src_edges, src_managed)
         else:
+            lstm_state = [None]
+            ep_start = [True]
+
+            def reset_trained():
+                lstm_state[0] = None
+                ep_start[0] = True
 
             def policy_trained(obs, env):
                 try:
+                    if is_recurrent:
+                        raw_action, lstm_state[0] = trained_agent.predict(
+                            obs,
+                            state=lstm_state[0],
+                            episode_start=np.array([ep_start[0]]),
+                            deterministic=True,
+                        )
+                        ep_start[0] = False
+                        return raw_action[: env.num_managed]
+
                     raw_action, _ = trained_agent.predict(obs, deterministic=True)
                     raw_action = raw_action[: env.num_managed]
 
@@ -313,6 +359,8 @@ def run_demo_for_topology(topology: str, args, base_results_dir: Path):
                     return final_action
                 except Exception:
                     return np.zeros(env.num_managed, dtype=np.int32)
+
+            policy_trained.reset = reset_trained
     else:
 
         def policy_trained(_obs, env):
