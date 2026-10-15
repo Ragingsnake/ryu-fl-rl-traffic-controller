@@ -8,7 +8,6 @@ from __future__ import annotations
 import argparse
 import os
 import sys
-import tarfile
 import urllib.request
 from pathlib import Path
 
@@ -16,7 +15,6 @@ if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
 import numpy as np
-
 
 SNDLIB_GEANT_URL = "http://sndlib.zib.de/download/directed-geant-uhlig-15min-over-4months-ALL-native.tar.gz"
 
@@ -32,7 +30,9 @@ def download_geant_archive(target_dir: str = "data/raw_geant") -> str | None:
 
     print(f"Attempting to download real GÉANT traces from {SNDLIB_GEANT_URL}...")
     try:
-        req = urllib.request.Request(SNDLIB_GEANT_URL, headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"})
+        req = urllib.request.Request(
+            SNDLIB_GEANT_URL, headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
+        )
         with urllib.request.urlopen(req, timeout=15) as response, open(archive_path, "wb") as out_file:
             data = response.read()
             out_file.write(data)
@@ -72,13 +72,32 @@ def parse_geant_matrices(
 
     # SNDlib GÉANT node names mapping
     node_mapping = {
-        "at": 0, "be": 1, "ch": 2, "cz": 3, "de": 4, "dk": 5, "es": 6, "fr": 7,
-        "gr": 8, "hr": 9, "hu": 10, "ie": 11, "il": 12, "it": 13, "lu": 14, "nl": 15,
-        "no": 16, "pl": 17, "pt": 18, "se": 19, "si": 20, "uk": 21
+        "at": 0,
+        "be": 1,
+        "ch": 2,
+        "cz": 3,
+        "de": 4,
+        "dk": 5,
+        "es": 6,
+        "fr": 7,
+        "gr": 8,
+        "hr": 9,
+        "hu": 10,
+        "ie": 11,
+        "il": 12,
+        "it": 13,
+        "lu": 14,
+        "nl": 15,
+        "no": 16,
+        "pl": 17,
+        "pt": 18,
+        "se": 19,
+        "si": 20,
+        "uk": 21,
     }
 
     for t, file_path in enumerate(matrix_files[:num_timesteps]):
-        with open(file_path, "r", encoding="utf-8", errors="ignore") as f:
+        with open(file_path, encoding="utf-8", errors="ignore") as f:
             for line in f:
                 line = line.strip()
                 if line.startswith("demand_") or "(" in line:
@@ -116,7 +135,14 @@ def main():
         synthetic_path = "data/generated/geant_traffic_matrices.npy"
         if not os.path.exists(synthetic_path):
             print("Generating synthetic GÉANT traffic matrices...")
-            from data.generate_tm import build_graph, generate_base_tms, generate_temporal_tms, load_topology, scale_alpha
+            from data.generate_tm import (
+                build_graph,
+                generate_base_tms,
+                generate_temporal_tms,
+                load_topology,
+                scale_alpha,
+            )
+
             topo = load_topology("data/geant_topology.json")
             G = build_graph(topo)
             base_tm = generate_base_tms(G)

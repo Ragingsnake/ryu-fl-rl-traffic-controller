@@ -249,7 +249,7 @@ def run_evaluations(args: argparse.Namespace):
     fl_model_path = args.fl_model_path if args.fl_model_path is not None else default_fl
     rl_model_path = args.rl_model_path if args.rl_model_path is not None else default_rl
 
-    print(f"============================================================")
+    print("============================================================")
     print(f"Evaluating Baselines on Topology: {topo.upper()}")
     print(f"  Topology file:    {topo_path}")
     print(f"  TM file:          {tm_path}")
@@ -257,7 +257,7 @@ def run_evaluations(args: argparse.Namespace):
     print(f"  RL Model:         {rl_model_path} (exists: {os.path.exists(rl_model_path)})")
     print(f"  Domain Data Dir:  {domain_data_dir}")
     print(f"  Managed OD pairs: {num_managed}")
-    print(f"============================================================")
+    print("============================================================")
 
     if not os.path.exists(tm_path):
         print("Mocking TM data for evaluation test...")
@@ -359,7 +359,9 @@ def run_evaluations(args: argparse.Namespace):
     print("=" * 80)
     print(df.to_string(index=False))
 
-    out_benchmark_csv = os.path.join(args.out_dir, f"benchmark_results_{topo}.csv" if topo != "nsfnet" else "benchmark_results.csv")
+    out_benchmark_csv = os.path.join(
+        args.out_dir, f"benchmark_results_{topo}.csv" if topo != "nsfnet" else "benchmark_results.csv"
+    )
     df.to_csv(out_benchmark_csv, index=False)
 
     # Summary table just with means
@@ -373,7 +375,9 @@ def run_evaluations(args: argparse.Namespace):
         summary_data.append(summary_row)
 
     df_summary = pd.DataFrame(summary_data)
-    out_summary_csv = os.path.join(args.out_dir, f"summary_table_{topo}.csv" if topo != "nsfnet" else "summary_table.csv")
+    out_summary_csv = os.path.join(
+        args.out_dir, f"summary_table_{topo}.csv" if topo != "nsfnet" else "summary_table.csv"
+    )
     df_summary.to_csv(out_summary_csv, index=False)
 
     print("\n" + "=" * 80)
@@ -428,7 +432,10 @@ def plot_evaluation_charts(df_summary: pd.DataFrame, output_dir: str = "results/
 
         for i, baseline in enumerate(baselines):
             sub = df_summary[df_summary["Baseline"] == baseline]
-            vals = [sub[sub["Scenario"] == s][col_name].values[0] if len(sub[sub["Scenario"] == s]) > 0 else 0 for s in scenarios]
+            vals = [
+                sub[sub["Scenario"] == s][col_name].values[0] if len(sub[sub["Scenario"] == s]) > 0 else 0
+                for s in scenarios
+            ]
             b_label = baseline_labels.get(baseline, baseline)
             ax.bar(x + i * width, vals, width, label=b_label, color=colors[i % len(colors)], alpha=0.85)
 
@@ -464,15 +471,27 @@ def plot_evaluation_charts(df_summary: pd.DataFrame, output_dir: str = "results/
             sub_b1 = df_summary[df_summary["Baseline"] == "B1"]
             sub_prop = df_summary[df_summary["Baseline"] == "Proposed"]
 
-            vals_b1 = [sub_b1[sub_b1["Scenario"] == s][col_name].values[0] if len(sub_b1[sub_b1["Scenario"] == s]) > 0 else 0 for s in scenarios]
-            vals_prop = [sub_prop[sub_prop["Scenario"] == s][col_name].values[0] if len(sub_prop[sub_prop["Scenario"] == s]) > 0 else 0 for s in scenarios]
+            vals_b1 = [
+                sub_b1[sub_b1["Scenario"] == s][col_name].values[0] if len(sub_b1[sub_b1["Scenario"] == s]) > 0 else 0
+                for s in scenarios
+            ]
+            vals_prop = [
+                sub_prop[sub_prop["Scenario"] == s][col_name].values[0]
+                if len(sub_prop[sub_prop["Scenario"] == s]) > 0
+                else 0
+                for s in scenarios
+            ]
 
             if is_pct:
                 vals_b1 = [v * 100.0 for v in vals_b1]
                 vals_prop = [v * 100.0 for v in vals_prop]
 
-            rects1 = ax.bar(x - width/2, vals_b1, width, label="OSPF-SPF (Industry Standard)", color="#DD8452", alpha=0.9)
-            rects2 = ax.bar(x + width/2, vals_prop, width, label="Proposed Trained FL+RL Agent", color="#4C72B0", alpha=0.9)
+            rects1 = ax.bar(
+                x - width / 2, vals_b1, width, label="OSPF-SPF (Industry Standard)", color="#DD8452", alpha=0.9
+            )
+            rects2 = ax.bar(
+                x + width / 2, vals_prop, width, label="Proposed Trained FL+RL Agent", color="#4C72B0", alpha=0.9
+            )
 
             ax.set_xlabel("Test Scenario", fontsize=11, fontweight="bold")
             ax.set_ylabel(ylabel, fontsize=11, fontweight="bold")
@@ -491,7 +510,9 @@ def plot_evaluation_charts(df_summary: pd.DataFrame, output_dir: str = "results/
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Evaluate FL+RL Traffic Engineering")
-    parser.add_argument("--topology", type=str, default="nsfnet", choices=["nsfnet", "geant", "abilene"], help="Network topology")
+    parser.add_argument(
+        "--topology", type=str, default="nsfnet", choices=["nsfnet", "geant", "abilene"], help="Network topology"
+    )
     parser.add_argument("--rl_model_path", type=str, default=None, help="Path to trained RL model")
     parser.add_argument("--fl_model_path", type=str, default=None, help="Path to FL prediction model")
     parser.add_argument("--num_managed_od", type=int, default=None, help="Number of managed OD pairs")

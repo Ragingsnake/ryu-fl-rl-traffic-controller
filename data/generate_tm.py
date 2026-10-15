@@ -164,7 +164,9 @@ def main():
 
     parser = argparse.ArgumentParser(description="Generate synthetic Traffic Matrices using Gravity Model")
     parser.add_argument("--topo", type=str, default="data/nsfnet_topology.json", help="Path to topology JSON")
-    parser.add_argument("--out", type=str, default="data/generated/traffic_matrices.npy", help="Path to output .npy file")
+    parser.add_argument(
+        "--out", type=str, default="data/generated/traffic_matrices.npy", help="Path to output .npy file"
+    )
     parser.add_argument("--timesteps", type=int, default=8064, help="Number of timesteps to generate")
     parser.add_argument("--utilization", type=float, default=0.85, help="Target peak link utilization")
     args = parser.parse_args()

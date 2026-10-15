@@ -1,5 +1,5 @@
-import os
 from pathlib import Path
+
 import numpy as np
 import pytest
 
@@ -8,11 +8,14 @@ from rl.env import NetworkRoutingEnv
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 
-@pytest.mark.parametrize("topo,num_edges,num_managed,expected_obs_dim", [
-    ("nsfnet", 44, 20, 44 * 2 + 20),
-    ("geant", 72, 30, 72 * 2 + 30),
-    ("abilene", 30, 15, 30 * 2 + 15),
-])
+@pytest.mark.parametrize(
+    "topo,num_edges,num_managed,expected_obs_dim",
+    [
+        ("nsfnet", 44, 20, 44 * 2 + 20),
+        ("geant", 72, 30, 72 * 2 + 30),
+        ("abilene", 30, 15, 30 * 2 + 15),
+    ],
+)
 def test_environment_initialization_and_spaces(topo, num_edges, num_managed, expected_obs_dim):
     if topo == "nsfnet":
         topo_path = str(BASE_DIR / "data" / "nsfnet_topology.json")
@@ -36,8 +39,12 @@ def test_environment_initialization_and_spaces(topo, num_edges, num_managed, exp
 
     assert env.num_edges == num_edges, f"Expected {num_edges} edges, got {env.num_edges}"
     assert env.num_managed == num_managed, f"Expected {num_managed} managed OD pairs, got {env.num_managed}"
-    assert env.observation_space.shape == (expected_obs_dim,), f"Expected obs shape ({expected_obs_dim},), got {env.observation_space.shape}"
-    assert len(env.action_space.nvec) == num_managed, f"Expected action space len {num_managed}, got {len(env.action_space.nvec)}"
+    assert env.observation_space.shape == (expected_obs_dim,), (
+        f"Expected obs shape ({expected_obs_dim},), got {env.observation_space.shape}"
+    )
+    assert len(env.action_space.nvec) == num_managed, (
+        f"Expected action space len {num_managed}, got {len(env.action_space.nvec)}"
+    )
 
     obs, info = env.reset(seed=42)
     assert obs.shape == (expected_obs_dim,)

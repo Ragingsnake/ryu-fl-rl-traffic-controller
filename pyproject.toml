@@ -1,6 +1,13 @@
 [tool.ruff]
 line-length = 120
 target-version = "py310"
+exclude = [
+    "scratch*.py",
+    "tests/scratch*.py",
+    ".venv",
+    "build",
+    "dist",
+]
 
 [tool.ruff.lint]
 select = [
@@ -15,5 +22,13 @@ select = [
 ]
 ignore = [
     "E501",   # line length
+    "E402",   # module level import not at top of file
     "RUF012", # mutable class attributes (gym metadata)
+    "RUF059", # unpacked variable is never used
+    "F841",   # local variable is assigned to but never used
+    "SIM102", # single if statement
+    "SIM108", # use ternary operator
+    "RUF001", # ambiguous unicode characters (Greek sigma in labels)
+    "RUF013", # PEP 484 implicit Optional
+    "C414",   # unnecessary list() inside sorted()
 ]

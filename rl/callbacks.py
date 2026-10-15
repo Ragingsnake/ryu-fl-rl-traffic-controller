@@ -1,14 +1,13 @@
 import csv
 import os
-import numpy as np
 
+import numpy as np
 from stable_baselines3.common.callbacks import BaseCallback
 
 
 def plot_training_curves(csv_path: str, output_dir: str = "results/demo", title_suffix: str = "") -> None:
     """Standalone utility to plot publication-quality, smooth training curves from CSV."""
     import matplotlib.pyplot as plt
-    import numpy as np
     import pandas as pd
 
     if not os.path.exists(csv_path):
@@ -23,18 +22,24 @@ def plot_training_curves(csv_path: str, output_dir: str = "results/demo", title_
     os.makedirs(output_dir, exist_ok=True)
 
     # 1. Aggregate parallel environments by step (eliminates vertical step-ladder lines and square waves)
-    df_step = df.groupby("step", as_index=False).agg({
-        "reward": ["mean", "std"],
-        "mlu": ["mean", "std"],
-        "avg_delay": ["mean", "std"],
-        "avg_loss": ["mean", "std"],
-    })
+    df_step = df.groupby("step", as_index=False).agg(
+        {
+            "reward": ["mean", "std"],
+            "mlu": ["mean", "std"],
+            "avg_delay": ["mean", "std"],
+            "avg_loss": ["mean", "std"],
+        }
+    )
     df_step.columns = [
         "step",
-        "reward", "reward_std",
-        "mlu", "mlu_std",
-        "avg_delay", "delay_std",
-        "avg_loss", "loss_std",
+        "reward",
+        "reward_std",
+        "mlu",
+        "mlu_std",
+        "avg_delay",
+        "delay_std",
+        "avg_loss",
+        "loss_std",
     ]
     df_step["reward_std"] = df_step["reward_std"].fillna(0.0)
     df_step["mlu_std"] = df_step["mlu_std"].fillna(0.0)
@@ -56,6 +61,7 @@ def plot_training_curves(csv_path: str, output_dir: str = "results/demo", title_
             return x, y
         try:
             from scipy.interpolate import make_interp_spline
+
             spl = make_interp_spline(x, y, k=min(3, len(x) - 1))
             x_new = np.linspace(x.min(), x.max(), num_points)
             y_new = spl(x_new)
@@ -84,7 +90,11 @@ def plot_training_curves(csv_path: str, output_dir: str = "results/demo", title_
     ax.scatter(df_step["step"], df_step["reward"], color="#64b5f6", alpha=0.5, s=18, label="Step Evaluation Points")
     ax.plot(x_spline, reward_trend, color="#1565c0", linewidth=2.6, label="Convergence Trend (Spline EMA)")
 
-    heading = f"PPO Training Convergence ({title_suffix}): Episode Reward over Timesteps" if title_suffix else "PPO Agent Training Convergence: Episode Reward over Time"
+    heading = (
+        f"PPO Training Convergence ({title_suffix}): Episode Reward over Timesteps"
+        if title_suffix
+        else "PPO Agent Training Convergence: Episode Reward over Time"
+    )
     ax.set_title(heading, fontsize=13, fontweight="bold", pad=12)
     ax.set_xlabel("Training Timesteps", fontsize=11, fontweight="bold")
     ax.set_ylabel("Cumulative Episode Reward", fontsize=11, fontweight="bold")
@@ -230,4 +240,3 @@ class MetricsCallback(BaseCallback):
 if __name__ == "__main__":
     cb = MetricsCallback(log_dir="./test_logs", verbose=1)
     print("MetricsCallback initialized successfully.")
-

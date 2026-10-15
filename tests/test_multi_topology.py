@@ -1,7 +1,7 @@
 import json
 from pathlib import Path
+
 import networkx as nx
-import pytest
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 

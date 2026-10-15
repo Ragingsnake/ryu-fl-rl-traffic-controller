@@ -38,12 +38,8 @@ def main():
         choices=["nsfnet", "geant", "abilene"],
         help="Target topology",
     )
-    parser.add_argument(
-        "--data_dir", type=str, default=None, help="Directory containing preprocessed domain data"
-    )
-    parser.add_argument(
-        "--model_save_path", type=str, default=None, help="Path to save the global model"
-    )
+    parser.add_argument("--data_dir", type=str, default=None, help="Directory containing preprocessed domain data")
+    parser.add_argument("--model_save_path", type=str, default=None, help="Path to save the global model")
 
     args = parser.parse_args()
 
@@ -60,7 +56,11 @@ def main():
         model_save_path = args.model_save_path
     else:
         if args.topology == "nsfnet":
-            model_save_path = f"models/fl_global_model_{args.strategy}.pt" if args.strategy != "fedavg" else "models/fl_global_model.pt"
+            model_save_path = (
+                f"models/fl_global_model_{args.strategy}.pt"
+                if args.strategy != "fedavg"
+                else "models/fl_global_model.pt"
+            )
         else:
             model_save_path = f"models/fl_global_model_{args.topology}_{args.strategy}.pt"
 
@@ -81,9 +81,7 @@ def main():
 
     def client_fn(cid: str) -> fl.client.Client:
         domain_id = int(cid)
-        train_loader, val_loader, f_in = load_data(
-            domain_id, data_dir=data_dir, batch_size=32, target_f_in=MAX_F_IN
-        )
+        train_loader, val_loader, f_in = load_data(domain_id, data_dir=data_dir, batch_size=32, target_f_in=MAX_F_IN)
         model = create_model(f_in=f_in)
         return TrafficClient(
             domain_id=domain_id, model=model, train_loader=train_loader, val_loader=val_loader

@@ -17,7 +17,7 @@ from stable_baselines3.common.env_util import make_vec_env
 from stable_baselines3.common.vec_env import DummyVecEnv, SubprocVecEnv
 
 from rl.callbacks import MetricsCallback
-from rl.env import NetworkRoutingEnv, NSFNETRoutingEnv
+from rl.env import NetworkRoutingEnv
 
 
 def linear_schedule(initial_value: float, final_value: float = 1e-5) -> Callable[[float], float]:
@@ -29,18 +29,31 @@ def linear_schedule(initial_value: float, final_value: float = 1e-5) -> Callable
 
 def main():
     parser = argparse.ArgumentParser(description="Train PPO Agent for Traffic Engineering")
-    parser.add_argument("--topology", type=str, default="nsfnet", choices=["nsfnet", "geant", "abilene"], help="Network topology")
+    parser.add_argument(
+        "--topology", type=str, default="nsfnet", choices=["nsfnet", "geant", "abilene"], help="Network topology"
+    )
     parser.add_argument("--timesteps", type=int, default=25000, help="Total timesteps to train")
     parser.add_argument("--n_envs", type=int, default=8, help="Number of parallel environments")
     parser.add_argument("--num_managed_od", type=int, default=None, help="Number of managed OD pairs")
-    parser.add_argument("--surge_prob", type=float, default=None, help="Probability of traffic surge during training (None = topology default)")
-    parser.add_argument("--ent_coef", type=float, default=None, help="Entropy exploration coefficient (None = topology default)")
-    parser.add_argument("--prior_bias", type=float, default=None, help="Prior bias towards Path 0 (None = topology default)")
+    parser.add_argument(
+        "--surge_prob",
+        type=float,
+        default=None,
+        help="Probability of traffic surge during training (None = topology default)",
+    )
+    parser.add_argument(
+        "--ent_coef", type=float, default=None, help="Entropy exploration coefficient (None = topology default)"
+    )
+    parser.add_argument(
+        "--prior_bias", type=float, default=None, help="Prior bias towards Path 0 (None = topology default)"
+    )
     parser.add_argument("--fl_model_path", type=str, default=None, help="Path to FL predictor model")
     parser.add_argument("--model_save_path", type=str, default=None, help="Path to save trained RL model")
     parser.add_argument("--log_dir", type=str, default="results/logs", help="Directory for logs")
     parser.add_argument("--model_dir", type=str, default="models", help="Directory to save model")
-    parser.add_argument("--recurrent", action="store_true", help="Use RecurrentPPO (MlpLstmPolicy) for temporal route stability")
+    parser.add_argument(
+        "--recurrent", action="store_true", help="Use RecurrentPPO (MlpLstmPolicy) for temporal route stability"
+    )
     args = parser.parse_args()
 
     os.makedirs(args.log_dir, exist_ok=True)
@@ -88,7 +101,7 @@ def main():
     prior_bias = args.prior_bias if args.prior_bias is not None else default_prior_bias
     surge_prob = args.surge_prob if args.surge_prob is not None else default_surge_prob
 
-    print(f"============================================================")
+    print("============================================================")
     print(f"Training PPO on Topology: {topo.upper()}")
     print(f"  Topology file:    {topo_path}")
     print(f"  TM file:          {tm_path}")
@@ -100,7 +113,7 @@ def main():
     print(f"  Prior Bias (P0):  {prior_bias}")
     print(f"  Surge Prob:       {surge_prob}")
     print(f"  Output Model:     {save_path}")
-    print(f"============================================================")
+    print("============================================================")
 
     def make_env():
         return NetworkRoutingEnv(
@@ -192,7 +205,9 @@ def main():
             bias[3 * i] = float(prior_bias)  # Path 0 (Shortest Path / OSPF prior)
             bias[3 * i + 1] = 0.0  # Path 1
             bias[3 * i + 2] = 0.0  # Path 2
-    print(f"Initialized policy head with prior bias {prior_bias:.2f} towards Path 0 for {num_managed} managed OD pairs.")
+    print(
+        f"Initialized policy head with prior bias {prior_bias:.2f} towards Path 0 for {num_managed} managed OD pairs."
+    )
 
     try:
         import tqdm  # noqa: F401

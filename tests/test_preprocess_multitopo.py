@@ -1,16 +1,19 @@
-import os
 from pathlib import Path
+
 import numpy as np
 import pytest
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 
-@pytest.mark.parametrize("topo,domain_dir,expected_max_f_in", [
-    ("nsfnet", "preprocessed", 24),
-    ("geant", "preprocessed_geant", 38),
-    ("abilene", "preprocessed_abilene", 16),
-])
+@pytest.mark.parametrize(
+    "topo,domain_dir,expected_max_f_in",
+    [
+        ("nsfnet", "preprocessed", 24),
+        ("geant", "preprocessed_geant", 38),
+        ("abilene", "preprocessed_abilene", 16),
+    ],
+)
 def test_preprocessed_tensors_invariants(topo, domain_dir, expected_max_f_in):
     data_dir = BASE_DIR / "data" / domain_dir
     assert data_dir.exists(), f"Preprocessed directory {data_dir} must exist"

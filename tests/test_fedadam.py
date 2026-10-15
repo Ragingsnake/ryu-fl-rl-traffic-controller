@@ -1,7 +1,7 @@
 import copy
 from pathlib import Path
+
 import torch
-import pytest
 
 from fl.model import create_model
 from fl.server import build_strategy

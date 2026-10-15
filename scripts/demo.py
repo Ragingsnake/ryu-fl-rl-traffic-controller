@@ -289,7 +289,11 @@ def run_demo_for_topology(topology: str, args, base_results_dir: Path):
             except Exception as e:
                 print(f"[{topology.upper()}] Warning: Failed to load RL agent ({e}).")
 
-        if trained_agent is not None and topology == "abilene" and ("geant" in rl_model_path or "ppo_agent.zip" in rl_model_path):
+        if (
+            trained_agent is not None
+            and topology == "abilene"
+            and ("geant" in rl_model_path or "ppo_agent.zip" in rl_model_path)
+        ):
             is_cross_eval = True
             print(f"[{topology.upper()}] Running CROSS-TOPOLOGY transfer evaluation (Source: {rl_model_path})!")
     else:
@@ -349,7 +353,9 @@ def run_demo_for_topology(topology: str, args, base_results_dir: Path):
 
                         # Proactive TE threshold: if primary path stressed, network in surge, or link failed
                         if (max_p0 >= 0.55) or (net_mlu >= 0.70) or has_failure:
-                            cand_edges = [(paths[chosen_p][i], paths[chosen_p][i + 1]) for i in range(len(paths[chosen_p]) - 1)]
+                            cand_edges = [
+                                (paths[chosen_p][i], paths[chosen_p][i + 1]) for i in range(len(paths[chosen_p]) - 1)
+                            ]
                             cand_utils = [obs[env.edge_to_idx[e]] for e in cand_edges if e in env.edge_to_idx]
                             max_cand = max(cand_utils) if cand_utils else 1.0
 
@@ -378,6 +384,7 @@ def run_demo_for_topology(topology: str, args, base_results_dir: Path):
         try:
             try:
                 from sb3_contrib import RecurrentPPO
+
                 geant_model = RecurrentPPO.load("models/ppo_agent_geant.zip", custom_objects=custom_objects)
             except Exception:
                 geant_model = PPO.load("models/ppo_agent_geant.zip", custom_objects=custom_objects)
@@ -746,7 +753,13 @@ def run_demo_for_topology(topology: str, args, base_results_dir: Path):
         t6_m = int(len(timesteps) * 0.4)
         t6_a = int(len(timesteps) * 0.6)
         ax.axvspan(0, t6_m, color="orange", alpha=0.15, label=f"Busy Morning (2x, t=0..{t6_m})")
-        ax.axvspan(t6_a, len(timesteps) - 1, color="green", alpha=0.15, label=f"Quiet Afternoon (0.3x, t={t6_a}..{len(timesteps)-1})")
+        ax.axvspan(
+            t6_a,
+            len(timesteps) - 1,
+            color="green",
+            alpha=0.15,
+            label=f"Quiet Afternoon (0.3x, t={t6_a}..{len(timesteps) - 1})",
+        )
         if thresh:
             ax.axhline(0.90, color="red", linestyle=":", label="Threshold (0.90)")
         ax.set_title(f"T6 Irregular Day: {m_label}", fontsize=11, fontweight="bold")

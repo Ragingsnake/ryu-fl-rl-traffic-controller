@@ -3,13 +3,27 @@ name: Train & Commit Model
 on:
   workflow_dispatch:
     inputs:
+      topology:
+        description: 'Network topology to train (nsfnet, geant, abilene)'
+        required: true
+        default: 'nsfnet'
+        type: choice
+        options:
+          - nsfnet
+          - geant
+          - abilene
       rl_timesteps:
         description: 'Total timesteps to train PPO RL agent'
         required: true
-        default: '200000'
+        default: '102400'
         type: string
+      use_recurrent:
+        description: 'Use RecurrentPPO (MlpLstmPolicy) to eliminate route flapping?'
+        required: false
+        default: true
+        type: boolean
       train_fl:
-        description: 'Retrain Federated Learning (FL) model before RL training? (Default: false, uses existing models/fl_global_model.pt)'
+        description: 'Retrain Federated Learning (FL) model before RL training?'
         required: false
         default: false
         type: boolean
@@ -44,26 +58,30 @@ jobs:
 
     - name: Generate Traffic Data & Preprocess
       run: |
-        python data/generate_tm.py
-        python data/preprocess.py
+        python data/generate_tm.py --topology ${{ inputs.topology }}
+        python data/preprocess.py --topology ${{ inputs.topology }}
 
     - name: Train Federated Learning (FL) Model
       if: ${{ inputs.train_fl == true }}
       run: |
-        python fl/train_fl.py --rounds ${{ inputs.fl_rounds }}
+        python fl/train_fl.py --topology ${{ inputs.topology }} --rounds ${{ inputs.fl_rounds }}
 
-    - name: Train Reinforcement Learning (RL) PPO Agent
+    - name: Train Reinforcement Learning (RL) Agent
       run: |
-        python rl/train_rl.py --timesteps ${{ inputs.rl_timesteps }}
+        ARGS="--topology ${{ inputs.topology }} --timesteps ${{ inputs.rl_timesteps }}"
+        if [ "${{ inputs.use_recurrent }}" = "true" ]; then
+          ARGS="$ARGS --recurrent"
+        fi
+        python rl/train_rl.py $ARGS
 
     - name: Commit and Push Updated Models
       run: |
         git config --local user.email "github-actions[bot]@users.noreply.github.com"
         git config --local user.name "github-actions[bot]"
-        git add -f models/ppo_agent.zip models/fl_global_model.pt
+        git add -f models/ppo_agent*.zip models/fl_global_model*.pt
         if git diff --staged --quiet; then
           echo "No model changes detected to commit."
         else
-          git commit -m "chore(models): retrain RL (${{ inputs.rl_timesteps }} steps) [skip ci]"
+          git commit -m "chore(models): retrain ${{ inputs.topology }} RL (${{ inputs.rl_timesteps }} steps) [skip ci]"
           git push origin main
         fi

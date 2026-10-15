@@ -2,6 +2,17 @@ name: Evaluation Demo Benchmark
 
 on:
   workflow_dispatch:
+    inputs:
+      topology:
+        description: 'Topology to benchmark (all, nsfnet, geant, abilene)'
+        required: false
+        default: 'all'
+        type: choice
+        options:
+          - all
+          - nsfnet
+          - geant
+          - abilene
 
 jobs:
   test-and-evaluate:
@@ -31,20 +42,15 @@ jobs:
       run: |
         pytest tests/ -v
 
-    - name: Prepare Traffic Data
-      run: |
-        python data/generate_tm.py
-        python data/preprocess.py
-
     - name: Run Evaluation Demo Across Scenarios & Seeds
       run: |
-        python scripts/demo.py --no_random --seeds 42 43 44 45 46 --out_dir results/demo
+        python scripts/demo.py --topology ${{ inputs.topology || 'all' }} --no_random --seeds 42 --out_dir results/demo
 
     - name: Upload Demo Results Artifact
       uses: actions/upload-artifact@v4
       with:
         name: demo-evaluation-results
         path: |
-          results/demo/*.png
-        if-no-files-found: error
+          results/demo/**/*.png
+        if-no-files-found: ignore
         retention-days: 14

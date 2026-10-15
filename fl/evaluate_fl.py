@@ -39,7 +39,9 @@ def main():
     import argparse
 
     parser = argparse.ArgumentParser(description="Evaluate FL Prediction Model")
-    parser.add_argument("--topology", type=str, default="nsfnet", choices=["nsfnet", "geant", "abilene"], help="Network topology")
+    parser.add_argument(
+        "--topology", type=str, default="nsfnet", choices=["nsfnet", "geant", "abilene"], help="Network topology"
+    )
     parser.add_argument("--model_path", type=str, default=None, help="Path to trained FL model checkpoint")
     parser.add_argument("--results_csv", type=str, default=None, help="Path to output CSV")
     args = parser.parse_args()

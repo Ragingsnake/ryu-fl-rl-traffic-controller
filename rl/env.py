@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import Optional
+
 import json
 import os
 import sys
@@ -29,7 +29,7 @@ MAX_F_IN = 7
 
 
 class DomainPredictor:
-    def __init__(self, fl_model_path: str, data_dir: Optional[str] = None):
+    def __init__(self, fl_model_path: str, data_dir: str | None = None):
         if data_dir is None:
             data_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "../data/preprocessed"))
         self.models = {}
@@ -118,9 +118,9 @@ class NSFNETRoutingEnv(gym.Env):
         self,
         topo_path: str,
         tm_path: str,
-        fl_model_path: Optional[str] = None,
+        fl_model_path: str | None = None,
         surge_prob: float = 0.0,
-        domain_data_dir: Optional[str] = None,
+        domain_data_dir: str | None = None,
         num_managed_od: int = 20,
     ):
         super().__init__()
@@ -155,7 +155,9 @@ class NSFNETRoutingEnv(gym.Env):
             self.tm_data = np.load(tm_path)
         else:
             print(f"Warning: TM data not found at {tm_path}. Using random mock data.")
-            self.tm_data = np.random.rand(8064, self.topology.number_of_nodes(), self.topology.number_of_nodes()) * 2.0  # Mbps
+            self.tm_data = (
+                np.random.rand(8064, self.topology.number_of_nodes(), self.topology.number_of_nodes()) * 2.0
+            )  # Mbps
 
         self.num_nodes = self.tm_data.shape[1]
         self.dataset_len = self.tm_data.shape[0]
@@ -239,7 +241,7 @@ class NSFNETRoutingEnv(gym.Env):
         self.disabled_links.add((v, u))
         self._recompute_paths()
 
-    def enable_link(self, u: int, v: int, capacity: Optional[float] = None, delay: Optional[float] = None):
+    def enable_link(self, u: int, v: int, capacity: float | None = None, delay: float | None = None):
         self.disabled_links.discard((u, v))
         self.disabled_links.discard((v, u))
         self._recompute_paths()
@@ -247,7 +249,7 @@ class NSFNETRoutingEnv(gym.Env):
     def set_link_failure(self, u: int, v: int, failure_step: int):
         self.scheduled_failures.append((failure_step, u, v))
 
-    def reset(self, seed: Optional[int] = None, options: Optional[dict] = None) -> tuple[np.ndarray, dict]:
+    def reset(self, seed: int | None = None, options: dict | None = None) -> tuple[np.ndarray, dict]:
         super().reset(seed=seed)
 
         # Random starting point in the dataset (ensuring room for EPISODE_LENGTH)
