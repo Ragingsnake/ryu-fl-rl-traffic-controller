@@ -78,9 +78,9 @@ def run_episode(env, policy_fn, start_idx: int, seed: int, scenario: str = "T1",
     fail_link = None
     if scenario == "T5":
         if len(env.topology.nodes) == 22:
-            fail_link = (1, 4)  # Paris - Frankfurt core link in GEANT
+            fail_link = (4, 7)  # Frankfurt - Paris core link in GEANT
         elif len(env.topology.nodes) == 12:
-            fail_link = (0, 10)  # Atlanta - Washington core link in Abilene
+            fail_link = (1, 11)  # Atlanta - Washington core link in Abilene
         elif env.topology.has_edge(8, 12):
             fail_link = (8, 12)  # NSFNET core link
         elif len(env.edges) > 0:
@@ -146,6 +146,7 @@ def make_transfer_policy(agent, src_edges: int, src_managed: int, with_ospf_fall
         # Congestion-guarded transfer: only take alternate path if primary is stressed and candidate is safer
         final_action = np.zeros(n_m, dtype=np.int32)
         has_failure = len(getattr(env, "disabled_links", set())) > 0
+        net_mlu = np.max(obs[:n_e]) if len(obs) >= n_e else 0.0
 
         for k in range(n_m):
             chosen_p = int(raw_action[k])
@@ -160,12 +161,12 @@ def make_transfer_policy(agent, src_edges: int, src_managed: int, with_ospf_fall
             p0_utils = [obs[env.edge_to_idx[e]] for e in p0_edges if e in env.edge_to_idx]
             max_p0 = max(p0_utils) if p0_utils else 0.0
 
-            if max_p0 >= 0.88 or has_failure:
+            if (max_p0 >= 0.55) or (net_mlu >= 0.70) or has_failure:
                 cand_edges = [(paths[chosen_p][i], paths[chosen_p][i + 1]) for i in range(len(paths[chosen_p]) - 1)]
                 cand_utils = [obs[env.edge_to_idx[e]] for e in cand_edges if e in env.edge_to_idx]
                 max_cand = max(cand_utils) if cand_utils else 1.0
 
-                if max_cand < max_p0:
+                if max_cand <= max_p0 + 0.12:
                     final_action[k] = chosen_p
 
         return final_action
@@ -280,8 +281,36 @@ def run_demo_for_topology(topology: str, args, base_results_dir: Path):
 
             def policy_trained(obs, env):
                 try:
-                    action, _ = trained_agent.predict(obs, deterministic=True)
-                    return action[: env.num_managed]
+                    raw_action, _ = trained_agent.predict(obs, deterministic=True)
+                    raw_action = raw_action[: env.num_managed]
+
+                    final_action = np.zeros(env.num_managed, dtype=np.int32)
+                    has_failure = len(getattr(env, "disabled_links", set())) > 0
+                    net_mlu = np.max(obs[: env.num_edges]) if len(obs) >= env.num_edges else 0.0
+
+                    for k in range(env.num_managed):
+                        chosen_p = int(raw_action[k])
+                        if chosen_p == 0:
+                            continue
+                        u, v = env.managed_od_pairs[k]
+                        paths = env.path_table.get((u, v), [])
+                        if len(paths) <= chosen_p or len(paths[0]) == 0 or len(paths[chosen_p]) == 0:
+                            continue
+
+                        p0_edges = [(paths[0][i], paths[0][i + 1]) for i in range(len(paths[0]) - 1)]
+                        p0_utils = [obs[env.edge_to_idx[e]] for e in p0_edges if e in env.edge_to_idx]
+                        max_p0 = max(p0_utils) if p0_utils else 0.0
+
+                        # Proactive TE threshold: if primary path stressed, network in surge, or link failed
+                        if (max_p0 >= 0.55) or (net_mlu >= 0.70) or has_failure:
+                            cand_edges = [(paths[chosen_p][i], paths[chosen_p][i + 1]) for i in range(len(paths[chosen_p]) - 1)]
+                            cand_utils = [obs[env.edge_to_idx[e]] for e in cand_edges if e in env.edge_to_idx]
+                            max_cand = max(cand_utils) if cand_utils else 1.0
+
+                            if max_cand <= max_p0 + 0.12:
+                                final_action[k] = chosen_p
+
+                    return final_action
                 except Exception:
                     return np.zeros(env.num_managed, dtype=np.int32)
     else:
@@ -729,6 +758,13 @@ def run_demo_for_topology(topology: str, args, base_results_dir: Path):
     plt.close()
 
     print(f"[{topology.upper()}] All multi-metric comparative plots successfully generated in {results_dir}!")
+
+    if topology == "nsfnet" and results_dir != base_results_dir:
+        import shutil
+
+        for img in results_dir.glob("*.png"):
+            shutil.copy2(img, base_results_dir / img.name)
+        print(f"[{topology.upper()}] Mirrored plots to root {base_results_dir} for dual accessibility.")
 
 
 def run_demo():

@@ -22,7 +22,7 @@ def load_abilene_traces(
     csv_path: str,
     output_path: str = "data/generated/abilene_traffic_matrices.npy",
     max_timesteps: int = 8064,
-    scale_factor: float = 4.0,
+    scale_factor: float = 9.0,
 ) -> np.ndarray:
     """
     Parses Abilene CSV NetFlow evaluation data into 3D traffic matrices.
@@ -95,8 +95,8 @@ def main():
     parser.add_argument(
         "--scale",
         type=float,
-        default=4.0,
-        help="Scaling multiplier for NetFlow demands to match 10Mbps link capacity (default 4.0)",
+        default=9.0,
+        help="Scaling multiplier for NetFlow demands to match 10Mbps link capacity (default 9.0)",
     )
     args = parser.parse_args()
 

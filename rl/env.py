@@ -397,22 +397,17 @@ class NSFNETRoutingEnv(gym.Env):
         avg_loss = total_loss / self.num_managed
 
         # h. Compute reward
-        # Piecewise congestion TE formulation (Fortz & Thorup):
-        # When links operate safely below 75% capacity, delay minimization and path stability
-        # are prioritized (encouraging Path 0 / Dijkstra shortest path).
-        # When link utilization breaches the 75% danger zone, steep congestion and loss penalties
-        # kick in, aggressively rewarding proactive rerouting away from bottleneck links.
+        # Multi-objective TE formulation (Spec §6.4 & System Architecture §1.2):
+        # R_t = -(1.0 * MLU_t + 0.5 * D_t^norm + 0.3 * ExcessDelay_t + 3.0 * L_t + 0.1 * Churn_t)
+        # Note: excess_delay penalizes unnecessary detours during normal traffic,
+        # while loss weight (3.0) strongly rewards rerouting during congestion bottlenecks.
         mlu = np.max(self.link_utils)
-        if mlu <= 0.75:
-            mlu_penalty = 0.2 * mlu
-        else:
-            mlu_penalty = 0.2 * 0.75 + 3.0 * (mlu - 0.75)
-
+        excess_delay = max(0.0, avg_delay - self.base_delay) / self.base_delay if self.base_delay > 0 else 0.0
         action_churn = float(np.mean(action != self.last_action))
         self.last_action = action.copy()
-        churn_penalty = 0.1 * action_churn
+        churn_penalty = 0.02 * action_churn
 
-        reward = -(mlu_penalty + 1.0 * avg_delay_norm + 3.0 * avg_loss + churn_penalty)
+        reward = -(1.0 * mlu + 0.5 * avg_delay_norm + 0.3 * excess_delay + 3.0 * avg_loss + churn_penalty)
 
         # i. Check done
         all_congested = np.all(self.link_utils > 0.95)
