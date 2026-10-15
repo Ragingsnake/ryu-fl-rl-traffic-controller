@@ -376,7 +376,11 @@ def run_demo_for_topology(topology: str, args, base_results_dir: Path):
     # If topology is abilene and geant model is available, include GEANT Transfer policy
     if topology == "abilene" and os.path.exists("models/ppo_agent_geant.zip"):
         try:
-            geant_model = PPO.load("models/ppo_agent_geant.zip", custom_objects=custom_objects)
+            try:
+                from sb3_contrib import RecurrentPPO
+                geant_model = RecurrentPPO.load("models/ppo_agent_geant.zip", custom_objects=custom_objects)
+            except Exception:
+                geant_model = PPO.load("models/ppo_agent_geant.zip", custom_objects=custom_objects)
             policies["GEANT Transfer"] = make_transfer_policy(
                 geant_model, src_edges=72, src_managed=30, with_ospf_fallback=True
             )
