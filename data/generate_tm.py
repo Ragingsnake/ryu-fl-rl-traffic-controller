@@ -158,11 +158,40 @@ def generate_temporal_tms(base_tm: np.ndarray, alpha: float, num_timesteps: int 
     return tms
 
 
+def generate_single_tm(topo_path: str, out_path: str, timesteps: int, utilization: float):
+    print(f"Starting Traffic Matrix generation for topology: {topo_path}...")
+    out_file = Path(out_path)
+    out_file.parent.mkdir(parents=True, exist_ok=True)
+
+    topology = load_topology(topo_path)
+    G = build_graph(topology)
+
+    print(f"Building base gravity model for {G.number_of_nodes()} nodes...")
+    base_tm = generate_base_tms(G)
+
+    print(f"Scaling to target capacity ({utilization * 100:.0f}% max link load)...")
+    alpha = scale_alpha(G, base_tm, target_utilization=utilization)
+
+    print(f"Generating temporal traffic matrices ({timesteps} timesteps)...")
+    tms = generate_temporal_tms(base_tm, alpha, num_timesteps=timesteps)
+
+    np.save(str(out_file), tms)
+    print(f"Generated TMs saved to: {out_file}")
+    print(f"TM shape: {tms.shape}, Mean demand: {np.mean(tms):.2f} bps, Max demand: {np.max(tms):.2f} bps\n")
+
+
 def main():
     """Main execution function for generating synthetic TMs."""
     import argparse
 
     parser = argparse.ArgumentParser(description="Generate synthetic Traffic Matrices using Gravity Model")
+    parser.add_argument(
+        "--topology",
+        type=str,
+        default=None,
+        choices=["nsfnet", "geant", "abilene", "all"],
+        help="Target topology (nsfnet, geant, abilene, or all)",
+    )
     parser.add_argument("--topo", type=str, default="data/nsfnet_topology.json", help="Path to topology JSON")
     parser.add_argument(
         "--out", type=str, default="data/generated/traffic_matrices.npy", help="Path to output .npy file"
@@ -171,25 +200,20 @@ def main():
     parser.add_argument("--utilization", type=float, default=0.85, help="Target peak link utilization")
     args = parser.parse_args()
 
-    print(f"Starting Traffic Matrix generation for topology: {args.topo}...")
-    out_file = Path(args.out)
-    out_file.parent.mkdir(parents=True, exist_ok=True)
+    topo_configs = {
+        "nsfnet": ("data/nsfnet_topology.json", "data/generated/traffic_matrices.npy"),
+        "geant": ("data/geant_topology.json", "data/generated/geant_traffic_matrices.npy"),
+        "abilene": ("data/abilene_topology.json", "data/generated/abilene_traffic_matrices.npy"),
+    }
 
-    topology = load_topology(args.topo)
-    G = build_graph(topology)
-
-    print(f"Building base gravity model for {G.number_of_nodes()} nodes...")
-    base_tm = generate_base_tms(G)
-
-    print(f"Scaling to target capacity ({args.utilization * 100:.0f}% max link load)...")
-    alpha = scale_alpha(G, base_tm, target_utilization=args.utilization)
-
-    print(f"Generating temporal traffic matrices ({args.timesteps} timesteps)...")
-    tms = generate_temporal_tms(base_tm, alpha, num_timesteps=args.timesteps)
-
-    np.save(str(out_file), tms)
-    print(f"Generated TMs saved to: {out_file}")
-    print(f"TM shape: {tms.shape}, Mean demand: {np.mean(tms):.2f} bps, Max demand: {np.max(tms):.2f} bps")
+    if args.topology == "all":
+        for t_name, (t_path, o_path) in topo_configs.items():
+            generate_single_tm(t_path, o_path, args.timesteps, args.utilization)
+    elif args.topology in topo_configs:
+        t_path, o_path = topo_configs[args.topology]
+        generate_single_tm(t_path, o_path, args.timesteps, args.utilization)
+    else:
+        generate_single_tm(args.topo, args.out, args.timesteps, args.utilization)
 
 
 if __name__ == "__main__":

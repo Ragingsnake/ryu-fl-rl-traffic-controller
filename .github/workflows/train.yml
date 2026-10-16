@@ -1,17 +1,18 @@
-name: Train & Commit Model
+name: Train Models Pipeline
 
 on:
   workflow_dispatch:
     inputs:
       topology:
-        description: 'Network topology to train (nsfnet, geant, abilene)'
+        description: 'Network topology to train (geant, nsfnet, abilene, all)'
         required: true
-        default: 'nsfnet'
+        default: 'geant'
         type: choice
         options:
-          - nsfnet
           - geant
+          - nsfnet
           - abilene
+          - all
       rl_timesteps:
         description: 'Total timesteps to train PPO RL agent'
         required: true
@@ -34,7 +35,7 @@ on:
         type: string
 
 jobs:
-  train-and-commit:
+  train-models:
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -50,6 +51,7 @@ jobs:
       with:
         python-version: '3.10'
         cache: 'pip'
+        cache-dependency-path: 'requirements.txt'
 
     - name: Install dependencies
       run: |
@@ -64,17 +66,44 @@ jobs:
     - name: Train Federated Learning (FL) Model
       if: ${{ inputs.train_fl == true }}
       run: |
-        python fl/train_fl.py --topology ${{ inputs.topology }} --rounds ${{ inputs.fl_rounds }}
+        if [ "${{ inputs.topology }}" = "all" ]; then
+          for t in nsfnet geant abilene; do
+            python fl/train_fl.py --topology $t --rounds ${{ inputs.fl_rounds }}
+          done
+        else
+          python fl/train_fl.py --topology ${{ inputs.topology }} --rounds ${{ inputs.fl_rounds }}
+        fi
 
     - name: Train Reinforcement Learning (RL) Agent
       run: |
-        ARGS="--topology ${{ inputs.topology }} --timesteps ${{ inputs.rl_timesteps }}"
-        if [ "${{ inputs.use_recurrent }}" = "true" ]; then
-          ARGS="$ARGS --recurrent"
+        if [ "${{ inputs.topology }}" = "all" ]; then
+          for t in nsfnet geant abilene; do
+            ARGS="--topology $t --timesteps ${{ inputs.rl_timesteps }}"
+            if [ "${{ inputs.use_recurrent }}" = "true" ]; then
+              ARGS="$ARGS --recurrent"
+            fi
+            python rl/train_rl.py $ARGS
+          done
+        else
+          ARGS="--topology ${{ inputs.topology }} --timesteps ${{ inputs.rl_timesteps }}"
+          if [ "${{ inputs.use_recurrent }}" = "true" ]; then
+            ARGS="$ARGS --recurrent"
+          fi
+          python rl/train_rl.py $ARGS
         fi
-        python rl/train_rl.py $ARGS
 
-    - name: Commit and Push Updated Models
+    - name: Export Trained Models as Artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: trained-models-${{ inputs.topology }}
+        path: |
+          models/ppo_agent*.zip
+          models/fl_global_model*.pt
+          results/demo/**/*.png
+        if-no-files-found: warn
+        retention-days: 30
+
+    - name: Commit and Push Updated Models to Repository
       run: |
         git config --local user.email "github-actions[bot]@users.noreply.github.com"
         git config --local user.name "github-actions[bot]"

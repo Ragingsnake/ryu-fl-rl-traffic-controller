@@ -121,48 +121,33 @@ def get_domain_edge_indices(G: nx.DiGraph, edges: list[tuple[int, int]], domain_
     return indices
 
 
-def main():
-    import argparse
-
-    parser = argparse.ArgumentParser(description="Preprocess traffic matrices for Federated Learning")
-    parser.add_argument(
-        "--topology",
-        type=str,
-        default="nsfnet",
-        choices=["nsfnet", "geant", "abilene"],
-        help="Topology name (nsfnet, geant, abilene)",
-    )
-    parser.add_argument("--topo_path", type=str, default=None, help="Custom path to topology JSON")
-    parser.add_argument("--tm_path", type=str, default=None, help="Custom path to traffic matrices .npy")
-    parser.add_argument("--out_dir", type=str, default=None, help="Custom output directory")
-    args = parser.parse_args()
-
-    print(f"Starting data preprocessing for topology: {args.topology}...")
+def preprocess_topology(topo_name: str, custom_topo_path=None, custom_tm_path=None, custom_out_dir=None):
+    print(f"Starting data preprocessing for topology: {topo_name}...")
     base_path = Path(__file__).parent
 
     # Determine default paths
-    if args.topo_path is not None:
-        topo_path = Path(args.topo_path)
+    if custom_topo_path is not None:
+        topo_path = Path(custom_topo_path)
     else:
-        topo_path = base_path / f"{args.topology}_topology.json"
+        topo_path = base_path / f"{topo_name}_topology.json"
 
-    if args.tm_path is not None:
-        tm_path = Path(args.tm_path)
+    if custom_tm_path is not None:
+        tm_path = Path(custom_tm_path)
     else:
-        if args.topology == "nsfnet":
+        if topo_name == "nsfnet":
             tm_path = base_path / "generated" / "traffic_matrices.npy"
-        elif args.topology == "geant":
+        elif topo_name == "geant":
             tm_path = base_path / "generated" / "geant_traffic_matrices.npy"
-        elif args.topology == "abilene":
+        elif topo_name == "abilene":
             tm_path = base_path / "generated" / "abilene_traffic_matrices.npy"
 
-    if args.out_dir is not None:
-        out_dir = Path(args.out_dir)
+    if custom_out_dir is not None:
+        out_dir = Path(custom_out_dir)
     else:
-        if args.topology == "nsfnet":
+        if topo_name == "nsfnet":
             out_dir = base_path / "preprocessed"
         else:
-            out_dir = base_path / f"preprocessed_{args.topology}"
+            out_dir = base_path / f"preprocessed_{topo_name}"
 
     out_dir.mkdir(parents=True, exist_ok=True)
     print(f"  Topology file: {topo_path}")
@@ -203,11 +188,9 @@ def main():
         split_val = int(total_windows * 0.85)
 
     # 4. FL Data Distribution (Domain splitting)
-    # Detect domains dynamically from topology nodes
     domain_labels = sorted(list({attr.get("domain", "A") for _, attr in G.nodes(data=True)}))
     print(f"Detected domains in topology: {domain_labels}")
 
-    # Map domain letters/numbers to numeric IDs 0, 1, 2...
     domain_to_id = {dom: idx for idx, dom in enumerate(domain_labels)}
 
     for domain in domain_labels:
@@ -215,11 +198,9 @@ def main():
         domain_idx = get_domain_edge_indices(G, edges, domain)
         print(f"Domain {domain} monitors {len(domain_idx)} edges.")
 
-        # Filter features for domain
         X_domain = X_global[:, :, domain_idx]
         Y_domain = Y_global[:, :, domain_idx]
 
-        # Split data
         max_train = min(split_train, len(X_domain))
         max_val = min(split_val, len(X_domain))
 
@@ -241,11 +222,33 @@ def main():
         np.save(str(out_dir / f"domain_{did}_test_X.npy"), X_test.astype(np.float32))
         np.save(str(out_dir / f"domain_{did}_test_Y.npy"), Y_test.astype(np.float32))
 
-        # Save edge indices mapping for global inference
         with open(str(out_dir / f"domain_{did}_edge_indices.json"), "w") as f:
             json.dump(domain_idx, f)
 
-    print(f"Preprocessing for {args.topology} completed successfully. Saved to {out_dir}")
+    print(f"Preprocessing for {topo_name} completed successfully. Saved to {out_dir}\n")
+
+
+def main():
+    import argparse
+
+    parser = argparse.ArgumentParser(description="Preprocess traffic matrices for Federated Learning")
+    parser.add_argument(
+        "--topology",
+        type=str,
+        default="nsfnet",
+        choices=["nsfnet", "geant", "abilene", "all"],
+        help="Topology name (nsfnet, geant, abilene, or all)",
+    )
+    parser.add_argument("--topo_path", type=str, default=None, help="Custom path to topology JSON")
+    parser.add_argument("--tm_path", type=str, default=None, help="Custom path to traffic matrices .npy")
+    parser.add_argument("--out_dir", type=str, default=None, help="Custom output directory")
+    args = parser.parse_args()
+
+    if args.topology == "all":
+        for t in ["nsfnet", "geant", "abilene"]:
+            preprocess_topology(t)
+    else:
+        preprocess_topology(args.topology, args.topo_path, args.tm_path, args.out_dir)
 
 
 if __name__ == "__main__":
