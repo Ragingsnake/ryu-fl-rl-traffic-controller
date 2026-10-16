@@ -191,13 +191,15 @@ def make_transfer_policy(agent, src_edges: int, src_managed: int, with_ospf_fall
             curr_p = current_action[0][k]
             if curr_p == 0:
                 # High threshold to activate alternate detour: primary stressed and candidate safer
-                if (max_p0 >= 0.65 or net_mlu >= 0.75 or has_failure) and (max_cand <= max_p0 + 0.08) and (chosen_p != 0):
+                if (
+                    (max_p0 >= 0.65 or net_mlu >= 0.75 or has_failure)
+                    and (max_cand <= max_p0 + 0.08)
+                    and (chosen_p != 0)
+                ):
                     current_action[0][k] = chosen_p
             else:
                 # Low threshold to revert to primary shortest path: primary completely calm
-                if (max_p0 < 0.48) and not has_failure:
-                    current_action[0][k] = 0
-                elif max_cand > max_p0 + 0.15:
+                if ((max_p0 < 0.48) and not has_failure) or (max_cand > max_p0 + 0.15):
                     current_action[0][k] = 0
 
         return current_action[0].copy()

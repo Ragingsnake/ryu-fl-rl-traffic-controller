@@ -1,0 +1,45 @@
+name: Start Azure VM (controller)
+
+on:
+  workflow_dispatch:
+    inputs:
+      resource_group:
+        description: 'Resource Group name'
+        required: true
+        default: 'ryu-rg'
+      vm_name:
+        description: 'Virtual Machine name'
+        required: true
+        default: 'controller'
+
+jobs:
+  start-vm:
+    name: Start Controller VM
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Log in to Azure
+        uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Start VM
+        run: |
+          echo "Starting VM '${{ inputs.vm_name }}' in resource group '${{ inputs.resource_group }}'..."
+          az vm start --resource-group "${{ inputs.resource_group }}" --name "${{ inputs.vm_name }}"
+
+      - name: Retrieve Public IP and Status
+        run: |
+          echo "Retrieving VM power status and network details..."
+          STATUS=$(az vm get-instance-view --resource-group "${{ inputs.resource_group }}" --name "${{ inputs.vm_name }}" --query "instanceView.statuses[?starts_with(code, 'PowerState/')].displayStatus" -o tsv)
+          IP=$(az vm list-ip-addresses --resource-group "${{ inputs.resource_group }}" --name "${{ inputs.vm_name }}" --query "[0].virtualMachine.network.publicIpAddresses[0].ipAddress" -o tsv)
+          
+          echo "=========================================================="
+          echo "  VM Name:        ${{ inputs.vm_name }}"
+          echo "  Resource Group: ${{ inputs.resource_group }}"
+          echo "  Power State:    $STATUS"
+          echo "  Public IP:      $IP"
+          echo "=========================================================="
+          if [ -n "$IP" ]; then
+            echo "SSH Command: ssh -i <path-to-rsa-key> azureuser@$IP"
+          fi

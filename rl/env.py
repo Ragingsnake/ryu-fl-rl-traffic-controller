@@ -262,7 +262,7 @@ class NSFNETRoutingEnv(gym.Env):
 
         # Stochastic curricular link failure during training
         if self.failure_prob > 0.0 and self.np_random.random() < self.failure_prob:
-            candidate_edges = [e for e in self.edges[:10]]
+            candidate_edges = list(self.edges[:10])
             if candidate_edges:
                 chosen_edge = candidate_edges[int(self.np_random.integers(0, len(candidate_edges)))]
                 fail_step = int(self.np_random.integers(25, 45))
