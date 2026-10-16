@@ -120,11 +120,13 @@ class NSFNETRoutingEnv(gym.Env):
         tm_path: str,
         fl_model_path: str | None = None,
         surge_prob: float = 0.0,
+        failure_prob: float = 0.0,
         domain_data_dir: str | None = None,
         num_managed_od: int = 20,
     ):
         super().__init__()
         self.surge_prob = surge_prob
+        self.failure_prob = failure_prob
 
         # --- 1. Load Topology ---
         self.topology = nx.DiGraph()
@@ -251,6 +253,20 @@ class NSFNETRoutingEnv(gym.Env):
 
     def reset(self, seed: int | None = None, options: dict | None = None) -> tuple[np.ndarray, dict]:
         super().reset(seed=seed)
+
+        # Clean up any disabled links from prior episode
+        if len(self.disabled_links) > 0:
+            self.disabled_links.clear()
+            self._recompute_paths()
+        self.scheduled_failures.clear()
+
+        # Stochastic curricular link failure during training
+        if self.failure_prob > 0.0 and self.np_random.random() < self.failure_prob:
+            candidate_edges = [e for e in self.edges[:10]]
+            if candidate_edges:
+                chosen_edge = candidate_edges[int(self.np_random.integers(0, len(candidate_edges)))]
+                fail_step = int(self.np_random.integers(25, 45))
+                self.set_link_failure(chosen_edge[0], chosen_edge[1], fail_step)
 
         # Random starting point in the dataset (ensuring room for EPISODE_LENGTH)
         # Use only training split ideally, but for simplicity pick any valid offset
@@ -409,7 +425,12 @@ class NSFNETRoutingEnv(gym.Env):
         self.last_action = action.copy()
         churn_penalty = 0.08 * action_churn
 
-        reward = -(1.0 * mlu + 0.5 * avg_delay_norm + 0.3 * excess_delay + 3.0 * avg_loss + churn_penalty)
+        # State-dependent delay penalty:
+        # When network is uncongested (MLU < 0.65), penalize taking alternate paths that add propagation delay.
+        # When network is congested (MLU >= 0.65), relax excess delay penalty so agent can reroute to eliminate packet loss.
+        delay_weight = 0.8 if mlu < 0.65 else 0.3
+
+        reward = -(1.0 * mlu + 0.5 * avg_delay_norm + delay_weight * excess_delay + 3.0 * avg_loss + churn_penalty)
 
         # i. Check done
         all_congested = np.all(self.link_utils > 0.95)

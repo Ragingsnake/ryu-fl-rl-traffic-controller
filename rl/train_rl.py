@@ -54,6 +54,9 @@ def main():
     parser.add_argument(
         "--recurrent", action="store_true", help="Use RecurrentPPO (MlpLstmPolicy) for temporal route stability"
     )
+    parser.add_argument(
+        "--failure_prob", type=float, default=None, help="Probability of stochastic link failure during training"
+    )
     args = parser.parse_args()
 
     os.makedirs(args.log_dir, exist_ok=True)
@@ -88,18 +91,16 @@ def main():
     fl_model_path = args.fl_model_path if args.fl_model_path is not None else default_fl
     save_path = args.model_save_path if args.model_save_path is not None else default_rl
 
-    # Calibrated 25k convergence hyperparameters:
-    # 1. Gentle prior bias 0.5 (~45% P0, ~27.5% P1, ~27.5% P2) encourages Path 0 without locking logits,
-    #    preventing policy freeze and enabling smooth ascending convergence from -115 to -65.
-    # 2. Balanced entropy coefficient (0.002) supports exploration of candidate paths during surges.
-    # 3. Controlled surge probability (0.25) provides frequent congestion events to learn rerouting.
+    # Calibrated convergence hyperparameters:
     default_ent_coef = 0.001
-    default_prior_bias = 0.3
+    default_prior_bias = 0.7 if topo == "geant" else 0.3
     default_surge_prob = 0.25
+    default_failure_prob = 0.05 if topo == "geant" else 0.0
 
     ent_coef = args.ent_coef if args.ent_coef is not None else default_ent_coef
     prior_bias = args.prior_bias if args.prior_bias is not None else default_prior_bias
     surge_prob = args.surge_prob if args.surge_prob is not None else default_surge_prob
+    failure_prob = args.failure_prob if args.failure_prob is not None else default_failure_prob
 
     print("============================================================")
     print(f"Training PPO on Topology: {topo.upper()}")
@@ -112,6 +113,7 @@ def main():
     print(f"  Exploration Ent:  {ent_coef}")
     print(f"  Prior Bias (P0):  {prior_bias}")
     print(f"  Surge Prob:       {surge_prob}")
+    print(f"  Failure Prob:     {failure_prob}")
     print(f"  Output Model:     {save_path}")
     print("============================================================")
 
@@ -121,6 +123,7 @@ def main():
             tm_path=tm_path,
             fl_model_path=fl_model_path if os.path.exists(fl_model_path) else None,
             surge_prob=surge_prob,
+            failure_prob=failure_prob,
             domain_data_dir=domain_data_dir,
             num_managed_od=num_managed,
         )

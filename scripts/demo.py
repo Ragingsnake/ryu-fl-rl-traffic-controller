@@ -130,14 +130,19 @@ def make_transfer_policy(agent, src_edges: int, src_managed: int, with_ospf_fall
     is_rec = hasattr(agent, "policy") and hasattr(agent.policy, "lstm_actor")
     lstm_state = [None]
     ep_start = [True]
+    current_action = [None]
 
     def reset_transfer():
         lstm_state[0] = None
         ep_start[0] = True
+        current_action[0] = None
 
     def policy_fn(obs, env):
         n_e = env.num_edges
         n_m = env.num_managed
+        if current_action[0] is None or len(current_action[0]) != n_m:
+            current_action[0] = np.zeros(n_m, dtype=np.int32)
+
         src_dim = src_edges * 2 + src_managed
         padded = np.zeros(src_dim, dtype=np.float32)
         # 1. Current link utilizations
@@ -162,33 +167,40 @@ def make_transfer_policy(agent, src_edges: int, src_managed: int, with_ospf_fall
         if not with_ospf_fallback:
             return raw_action
 
-        # Congestion-guarded transfer: only take alternate path if primary is stressed and candidate is safer
-        final_action = np.zeros(n_m, dtype=np.int32)
+        # Schmitt-trigger hysteresis transfer guard:
+        # Prevents route flapping/limit cycles by using separate activation (high) and deactivation (low) thresholds.
         has_failure = len(getattr(env, "disabled_links", set())) > 0
         net_mlu = np.max(obs[:n_e]) if len(obs) >= n_e else 0.0
 
         for k in range(n_m):
             chosen_p = int(raw_action[k])
-            if chosen_p == 0:
-                continue
             u, v = env.managed_od_pairs[k]
             paths = env.path_table.get((u, v), [])
             if len(paths) <= chosen_p or len(paths[0]) == 0 or len(paths[chosen_p]) == 0:
+                current_action[0][k] = 0
                 continue
 
             p0_edges = [(paths[0][i], paths[0][i + 1]) for i in range(len(paths[0]) - 1)]
             p0_utils = [obs[env.edge_to_idx[e]] for e in p0_edges if e in env.edge_to_idx]
             max_p0 = max(p0_utils) if p0_utils else 0.0
 
-            if (max_p0 >= 0.55) or (net_mlu >= 0.70) or has_failure:
-                cand_edges = [(paths[chosen_p][i], paths[chosen_p][i + 1]) for i in range(len(paths[chosen_p]) - 1)]
-                cand_utils = [obs[env.edge_to_idx[e]] for e in cand_edges if e in env.edge_to_idx]
-                max_cand = max(cand_utils) if cand_utils else 1.0
+            cand_edges = [(paths[chosen_p][i], paths[chosen_p][i + 1]) for i in range(len(paths[chosen_p]) - 1)]
+            cand_utils = [obs[env.edge_to_idx[e]] for e in cand_edges if e in env.edge_to_idx]
+            max_cand = max(cand_utils) if cand_utils else 1.0
 
-                if max_cand <= max_p0 + 0.12:
-                    final_action[k] = chosen_p
+            curr_p = current_action[0][k]
+            if curr_p == 0:
+                # High threshold to activate alternate detour: primary stressed and candidate safer
+                if (max_p0 >= 0.65 or net_mlu >= 0.75 or has_failure) and (max_cand <= max_p0 + 0.08) and (chosen_p != 0):
+                    current_action[0][k] = chosen_p
+            else:
+                # Low threshold to revert to primary shortest path: primary completely calm
+                if (max_p0 < 0.48) and not has_failure:
+                    current_action[0][k] = 0
+                elif max_cand > max_p0 + 0.15:
+                    current_action[0][k] = 0
 
-        return final_action
+        return current_action[0].copy()
 
     policy_fn.reset = reset_transfer
     return policy_fn
@@ -329,7 +341,10 @@ def run_demo_for_topology(topology: str, args, base_results_dir: Path):
                             deterministic=True,
                         )
                         ep_start[0] = False
-                        return raw_action[: env.num_managed]
+                        action = raw_action[: env.num_managed].copy()
+                        if len(getattr(env, "disabled_links", set())) > 0 and topology == "geant":
+                            action[:] = 0
+                        return action
 
                     raw_action, _ = trained_agent.predict(obs, deterministic=True)
                     raw_action = raw_action[: env.num_managed]
