@@ -131,17 +131,22 @@ def make_transfer_policy(agent, src_edges: int, src_managed: int, with_ospf_fall
     lstm_state = [None]
     ep_start = [True]
     current_action = [None]
+    hold_count = [None]
 
     def reset_transfer():
         lstm_state[0] = None
         ep_start[0] = True
         current_action[0] = None
+        hold_count[0] = None
 
     def policy_fn(obs, env):
         n_e = env.num_edges
         n_m = env.num_managed
         if current_action[0] is None or len(current_action[0]) != n_m:
             current_action[0] = np.zeros(n_m, dtype=np.int32)
+            hold_count[0] = np.zeros(n_m, dtype=np.int32)
+
+        hold_count[0] += 1
 
         src_dim = src_edges * 2 + src_managed
         padded = np.zeros(src_dim, dtype=np.float32)
@@ -167,11 +172,8 @@ def make_transfer_policy(agent, src_edges: int, src_managed: int, with_ospf_fall
         if not with_ospf_fallback:
             return raw_action
 
-        # Schmitt-trigger hysteresis transfer guard:
-        # Prevents route flapping/limit cycles by using separate activation (high) and deactivation (low) thresholds.
-        has_failure = len(getattr(env, "disabled_links", set())) > 0
-        net_mlu = np.max(obs[:n_e]) if len(obs) >= n_e else 0.0
-
+        # Safe Transfer Routing:
+        # Flow-local congestion detection + RFC 2439 route flap damping (min 3 steps hold)
         for k in range(n_m):
             chosen_p = int(raw_action[k])
             u, v = env.managed_od_pairs[k]
@@ -181,26 +183,31 @@ def make_transfer_policy(agent, src_edges: int, src_managed: int, with_ospf_fall
                 continue
 
             p0_edges = [(paths[0][i], paths[0][i + 1]) for i in range(len(paths[0]) - 1)]
+            p0_has_failure = any(e in getattr(env, "disabled_links", set()) for e in p0_edges)
             p0_utils = [obs[env.edge_to_idx[e]] for e in p0_edges if e in env.edge_to_idx]
             max_p0 = max(p0_utils) if p0_utils else 0.0
 
             cand_edges = [(paths[chosen_p][i], paths[chosen_p][i + 1]) for i in range(len(paths[chosen_p]) - 1)]
+            cand_has_failure = any(e in getattr(env, "disabled_links", set()) for e in cand_edges)
             cand_utils = [obs[env.edge_to_idx[e]] for e in cand_edges if e in env.edge_to_idx]
             max_cand = max(cand_utils) if cand_utils else 1.0
 
             curr_p = current_action[0][k]
             if curr_p == 0:
-                # High threshold to activate alternate detour: primary stressed and candidate safer
-                if (
-                    (max_p0 >= 0.65 or net_mlu >= 0.75 or has_failure)
-                    and (max_cand <= max_p0 + 0.08)
-                    and (chosen_p != 0)
-                ):
-                    current_action[0][k] = chosen_p
+                # Flow-local trigger: Only detour if flow k's own path p0 is stressed (>= 0.72) or failed
+                if (max_p0 >= 0.72 or p0_has_failure) and (chosen_p != 0) and not cand_has_failure:
+                    if (max_cand < max_p0 - 0.03) or p0_has_failure:
+                        current_action[0][k] = chosen_p
+                        hold_count[0][k] = 0
             else:
-                # Low threshold to revert to primary shortest path: primary completely calm
-                if ((max_p0 < 0.48) and not has_failure) or (max_cand > max_p0 + 0.15):
+                # If currently detoured, hold for at least 3 steps to eliminate limit-cycle thrashing
+                if cand_has_failure:
                     current_action[0][k] = 0
+                    hold_count[0][k] = 0
+                elif hold_count[0][k] >= 3:
+                    if (max_p0 < 0.55 and not p0_has_failure) or (max_cand > max_p0 + 0.05):
+                        current_action[0][k] = 0
+                        hold_count[0][k] = 0
 
         return current_action[0].copy()
 
