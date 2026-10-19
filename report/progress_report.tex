@@ -85,9 +85,9 @@ Hệ thống nguyên mẫu (\textbf{Prototype}) trong thư mục dự án hiện
 
 \subsection{Mô hình Học tăng cường RecurrentPPO và Chống Dao động Tuyến}
 \begin{itemize}
-    \item Huấn luyện thành công tác tử \texttt{RecurrentPPO} (\texttt{MlpLstmPolicy}) cho mạng NSFNET (102.4k bước) và GÉANT (204.8k bước).
+    \item Huấn luyện thành công tác tử \texttt{RecurrentPPO} (\texttt{MlpLstmPolicy}) trên cả 3 mạng: NSFNET (100k bước), GÉANT (204.8k bước) và Abilene (100k bước). Mô hình Abilene được huấn luyện độc lập từ tập dữ liệu Abilene nhằm làm mốc đối sánh cơ sở (In-Domain Baseline) để đánh giá khả năng chuyển giao không mẫu (Zero-Shot Cross-Topology Transfer).
     \item Thiết kế hàm phần thưởng đa mục tiêu với \textbf{phạt trễ phụ thuộc trạng thái}: phạt trễ $0.8$ khi $\text{MLU} < 0.65$ (giữ nguyên đường ngắn nhất OSPF khi mạng nhàn rỗi) và giảm xuống $0.3$ khi $\text{MLU} \ge 0.65$ (ưu tiên chuyển luồng né nghẽn để triệt tiêu mất gói).
-    \item Thiết kế \textbf{bộ điều khiển rơ-le trễ hai ngưỡng Schmitt-Trigger} ($\tau_{high}=0.65, \tau_{low}=0.48$) kết hợp với trạng thái nhớ của LSTM, ép tỷ lệ nhảy tuyến (Route Churn) xuống dưới $0.4\%$, loại bỏ hoàn toàn hiện tượng rung giật tuyến (Route Flapping).
+    \item Thiết kế \textbf{bộ điều khiển rơ-le trễ hai ngưỡng Schmitt-Trigger} kết hợp bộ nhớ LSTM, ép tỷ lệ nhảy tuyến (Route Churn) xuống dưới $0.4\%$, loại bỏ hoàn toàn rung giật tuyến.
     \item Xây dựng cơ chế \textbf{SDN Link-Failure Failover}: khi phát hiện đứt cáp, tự động chuyển ngay các luồng bị ảnh hưởng sang đường đi ngắn nhất thay thế (Bypass Path 0), giữ vững tỷ lệ mất gói bằng $0.00\%$.
 \end{itemize}
 
@@ -236,14 +236,36 @@ Trong mạng NSFNET có $14 \times 13 = 182$ cặp nút nguồn-đích. Nếu qu
 \end{algorithmic}
 \end{algorithm}
 
-\subsection{Góp ý 9: Biểu đồ reward tích lũy}
-\textbf{Giải pháp đã hoàn thiện:} Đã tích hợp đồ thị hội tụ huấn luyện của mô hình GÉANT (Hình \ref{fig:reward_curve}): phần thưởng tích lũy tăng đều đặn từ $-120$ lên $-72.1$, phương sai giải thích \texttt{explained\_variance} đạt mức lý tưởng \textbf{$0.983$}, và hàm mất mát của mạng Critic (\texttt{value\_loss}) giảm từ $18.4$ xuống chỉ còn $0.234$.
+\subsection{Góp ý 9: Biểu đồ reward tích lũy và Huấn luyện Đa Topo}
+\textbf{Giải pháp đã hoàn thiện:} Đã tích hợp đồ thị hội tụ phần thưởng tích lũy huấn luyện của cả 3 mô hình trên 3 mạng độc lập (Hình \ref{fig:all_training_curves}):
+\begin{itemize}
+    \item \textbf{NSFNET (100k bước):} Phần thưởng tích lũy tăng đều từ $-115$ lên $-85.2$, explained variance đạt $0.892$.
+    \item \textbf{GÉANT (204.8k bước):} Phần thưởng tăng từ $-120$ lên $-72.1$, explained variance đạt mức lý tưởng $0.983$, value loss giảm sâu về $0.234$.
+    \item \textbf{Abilene (100k bước):} Phần thưởng hội tụ ổn định tại $-87.9$, explained variance $0.919$. \textbf{Lưu ý đặc biệt:} Nhóm chủ động sử dụng tập dữ liệu Abilene để huấn luyện độc lập mô hình nội miền này nhằm thiết lập mốc chuẩn đối sánh cơ sở (In-Domain Baseline), qua đó đo đạc và kiểm chứng năng lực tổng quát hóa của phương pháp chuyển giao mô hình không mẫu (Zero-Shot Cross-Topology Transfer) từ GÉANT sang Abilene.
+\end{itemize}
 
 \begin{figure}[htbp]
     \centering
-    \includegraphics[width=0.75\textwidth]{figures/geant_convergence.png}
-    \caption{Đồ thị hội tụ phần thưởng tích lũy (Cumulative Episode Reward) trên mạng GÉANT.}
-    \label{fig:reward_curve}
+    \begin{subfigure}[b]{0.32\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{figures/training_nsfnet.png}
+        \caption{NSFNET (100k bước)}
+        \label{fig:train_nsfnet}
+    \end{subfigure}\hfill
+    \begin{subfigure}[b]{0.32\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{figures/training_geant.png}
+        \caption{GÉANT (204.8k bước)}
+        \label{fig:train_geant}
+    \end{subfigure}\hfill
+    \begin{subfigure}[b]{0.32\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{figures/training_abilene.png}
+        \caption{Abilene (100k bước)}
+        \label{fig:train_abilene}
+    \end{subfigure}
+    \caption{Đồ thị hội tụ phần thưởng huấn luyện (Episode Reward) của cả 3 mô hình RecurrentPPO.}
+    \label{fig:all_training_curves}
 \end{figure}
 
 \subsection{Góp ý 10: Mô hình huấn luyện FL: đầu vào, đầu ra, thang đo}
@@ -264,6 +286,26 @@ Trong mạng NSFNET có $14 \times 13 = 182$ cặp nút nguồn-đích. Nếu qu
     \item Quyết định cuối cùng được chuyển xuống Ryu Controller để cập nhật bảng luồng OpenFlow chỉ cho các luồng bị đổi tuyến, đảm bảo thông lượng không bị ngắt quãng.
 \end{enumerate}
 
+\subsection{Cơ chế Hoạt động của Chuyển giao Mô hình Đa Topo (Model Transfer)}
+\textbf{Giải pháp đã hoàn thiện:} Chuyển giao mô hình từ topo nguồn (GÉANT: 72 liên kết, 30 luồng) sang topo đích (Abilene: 30 liên kết, 15 luồng) được hiện thực hóa qua 2 tầng cốt lõi:
+\begin{enumerate}
+    \item \textbf{Căn chỉnh Không gian Quan sát và Hành động (Dimension Alignment):} Vector trạng thái của topo đích ($30 \times 2 + 15 = 75$ chiều) được ghép nối vào không gian đầu vào nguồn ($174$ chiều) bằng kỹ thuật \textit{zero-padding} (đệm 0 vào các chiều dư thừa). Hành động dự đoán từ mạng nơ-ron nguồn được trích xuất cho đúng $N_m=15$ luồng quản lý của topo đích.
+    \item \textbf{Kiểm định Tải Dự phóng và Chống Rung Giật (Projected Load Verification \& Hold-Down Damping):} Để ngăn ngừa triệt để hiện tượng dao động tuyến (route flapping / ping-pong limit cycles) do chênh lệch miền dữ liệu, hệ thống tích hợp bộ lọc an toàn SDN:
+    \begin{itemize}
+        \item \textit{Rẽ nhánh né nghẽn:} Luồng chỉ rời Tuyến 0 sang tuyến phụ nếu Tuyến 0 bị nghẽn ($\text{Util} \ge 0.78$ hoặc đứt cáp) VÀ tải dự phóng trên tuyến phụ sau khi gánh thêm nhu cầu luồng $\left(\text{Util}_{cand} + \frac{\text{Demand}}{\text{Cap}_{cand}}\right)$ vẫn thấp hơn Tuyến 0 ít nhất $2\%$.
+        \item \textit{Hồi quy tuyến chính:} Khi tải hạ nhiệt, luồng bắt buộc được giữ ổn định ít nhất 15 bước thời gian ($T_{hold} \ge 15$) và chỉ được quay về Tuyến 0 nếu tải dự phóng của Tuyến 0 khi nhận lại luồng $\left(\text{Util}_{p0} + \frac{\text{Demand}}{\text{Cap}_{p0}}\right) < 0.72$.
+    \end{itemize}
+\end{enumerate}
+Cơ chế này giúp chính sách chuyển giao hoạt động ổn định trên mọi cấu trúc đồ thị, triệt tiêu hoàn toàn dao động và hạ Churn xuống $\le 0.07\%$.
+
+\subsection{Lý giải Hiệu năng ở Kịch bản Bình thường (T1) so với OSPF}
+\textbf{Giải pháp đã hoàn thiện:} Báo cáo làm rõ nguyên nhân vì sao ở kịch bản T1 (mạng nhàn rỗi), các mô hình RL nội miền có độ trễ cao hơn OSPF một chút, và vì sao mô hình GEANT Transfer trên Abilene là ngoại lệ duy nhất:
+\begin{itemize}
+    \item \textbf{OSPF tối ưu trễ khi mạng nhàn rỗi:} Trong T1, tải mạng thấp ($\text{MLU} < 0.65$), độ trễ hàng đợi bằng $0$. OSPF chuyển $100\%$ lưu lượng theo đường ngắn nhất tuyệt đối (Tuyến 0) với số hop và khoảng cách vật lý tối thiểu, do đó đạt độ trễ truyền lan lý tưởng.
+    \item \textbf{Mô hình RL nội miền (NSFNET, GÉANT, Abilene):} Do đặc tính phân phối xác suất mềm của mạng nơ-ron (chính sách entropy), tác tử thỉnh thoảng rẽ nhánh một tỷ lệ luồng rất nhỏ sang Tuyến 1 để thăm dò và cân bằng tải dự phòng. Do Tuyến 1 có số hop hoặc độ dài cáp lớn hơn Tuyến 0, độ trễ truyền lan trung bình bị tăng nhẹ ($+0.1$ đến $+0.4$ ms) so với OSPF.
+    \item \textbf{Ngoại lệ duy nhất -- GEANT Transfer trên Abilene:} Nhờ bộ kiểm định tải dự phóng, khi Tuyến 0 chưa chạm ngưỡng nghẽn ($\text{Util} < 0.78$), chính sách ép cứng mọi luồng chạy trên Tuyến 0 (OSPF Fallback). Tỷ lệ Churn đạt tuyệt đối $0.00\%$, loại bỏ hoàn toàn các quyết định rẽ nhánh ngẫu nhiên, giúp độ trễ và mất gói giữ mức tối ưu tương đương OSPF.
+\end{itemize}
+
 \subsection{Góp ý 12: Cần mô tả thiết lập ban đầu và so sánh}
 \textbf{Giải pháp đã hoàn thiện:} Toàn bộ các thử nghiệm được chuẩn hóa trên 6 kịch bản khắt khe (T1 đến T6) với 4 đối tượng so sánh đại diện (OSPF, Untrained Random, In-Domain FL+RL Agent, và Transferred Agent) được đối sánh chi tiết theo 5 chỉ số định lượng: Mean MLU, Peak MLU, Delay (ms), Packet Loss (\%), và Route Churn (\%).
 
@@ -278,6 +320,77 @@ Trong mạng NSFNET có $14 \times 13 = 182$ cặp nút nguồn-đích. Nếu qu
 
 % ==============================================================================
 % PHẦN III
+% ==============================================================================
+\section{Đặc tả 6 Kịch bản Thực nghiệm (T1--T6) và Đánh giá Toàn cảnh 3 Mạng}
+
+\subsection{Đặc tả 6 Kịch bản Thực nghiệm Chuẩn hóa (T1 đến T6)}
+Để đánh giá toàn diện năng lực thích ứng, hệ thống kiểm thử tự động trên 6 kịch bản thực tế:
+\begin{itemize}
+    \item \textbf{T1 (Normal Traffic):} Tải nền chuẩn theo mô hình trọng lực (Gravity Model) có chu kỳ ngày đêm, không có sự cố; kiểm tra tính ổn định và mức trễ cơ sở.
+    \item \textbf{T2 (Traffic Spike):} Đột biến tức thời gấp $3\times$ trên các luồng quản lý tại $t \in [30, 40]$ (mô phỏng truyền dữ liệu lớn); kiểm tra tốc độ né nghẽn cục bộ.
+    \item \textbf{T3 (Gradual Load Ramp):} Tải toàn mạng tăng tuyến tính $+50\%$ trong 100 bước; kiểm tra khả năng tái cân bằng dưới áp lực tải kéo dài.
+    \item \textbf{T4 (Flash Crowd):} Dồn tải đột biến cực đoan gấp $5\times$ trên nhóm luồng lớn tại $t \in [50, 55]$; kiểm tra khả năng chống tràn hàng đợi và triệt tiêu rớt gói.
+    \item \textbf{T5 (Link Failure):} Đứt một liên kết xương sống tại $t=30$ (GÉANT: liên kết (4, 7); NSFNET: liên kết (8, 12); Abilene: liên kết (2, 3)); kiểm tra năng lực phản xạ chịu lỗi (SDN failover) tức thời.
+    \item \textbf{T6 (Irregular Day / Extreme Stress):} Đỉnh tải buổi sáng kéo dài kết hợp xung đột đa liên kết ngẫu nhiên; kiểm tra tính vững chắc trước phân phối lưu lượng bất thường (OOD).
+\end{itemize}
+\textbf{Cơ chế vận hành với tập dữ liệu Abilene và GÉANT:} Chuỗi ma trận lưu lượng thực nghiệm của Abilene và GÉANT được phát lại theo thời gian thực làm dữ liệu nền. Bộ điều phối (\texttt{traffic\_orchestrator}) tiêm các biến đổi kịch bản trực tiếp vào môi trường. Các mô hình AI đã nạp sẵn hoàn toàn không được biết trước kịch bản mà chỉ phản xạ dựa trên dữ liệu viễn trắc (telemetry) OpenFlow và dự báo từ FL, đảm bảo tính khách quan tuyệt đối.
+
+\subsection{Trường hợp 1: Đánh giá Toàn cảnh trên Mạng NSFNET (14 nút, 42 liên kết)}
+Hình \ref{fig:overview_nsfnet} biểu diễn diễn biến mức sử dụng liên kết lớn nhất (MLU) của OSPF và Tác tử FL+RL qua 6 kịch bản trên mạng NSFNET:
+\begin{itemize}
+    \item \textbf{T1:} Cả OSPF và RL duy trì MLU thấp ($< 0.65$), mạng hoàn toàn ổn định.
+    \item \textbf{T2 \& T4:} Các đợt bùng phát tải đẩy OSPF vượt ngưỡng nguy hiểm ($> 0.90$), gây rớt gói nghiêm trọng. Tác tử RL nhận diện nguy cơ nghẽn sớm, dàn luồng sang các tuyến phụ giúp hạ đỉnh MLU xuống dưới $0.75$, triệt tiêu mất gói.
+    \item \textbf{T3:} Khi tải tăng dần, OSPF chạm sát mốc $1.0$, trong khi RL phân phối luồng đồng đều, giữ MLU ở mức an toàn $\approx 0.72$.
+    \item \textbf{T5:} Khi liên kết (8, 12) bị đứt tại $t=30$, OSPF bị thắt nút cổ chai (MLU vọt lên $0.88$). Tác tử lập tức kích hoạt đường vòng bypass, đưa MLU về mức ổn định $0.70$ với $0\%$ mất gói.
+    \item \textbf{T6:} Đường MLU của tác tử luôn chạy thấp hơn OSPF $10-15\%$ xuyên suốt cả ngày bất thường.
+\end{itemize}
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=0.72\textwidth]{figures/overview_nsfnet_mlu.png}
+    \caption{Diễn biến MLU qua 6 kịch bản trên mạng NSFNET giữa OSPF và Tác tử FL+RL.}
+    \label{fig:overview_nsfnet}
+\end{figure}
+
+\subsection{Trường hợp 2: Đánh giá Toàn cảnh trên Mạng GÉANT (22 nút, 72 liên kết)}
+Hình \ref{fig:overview_geant} biểu diễn hiệu năng trên mạng lõi GÉANT có mật độ kết nối cao và dung lượng $2.5\text{ Gbps}$:
+\begin{itemize}
+    \item \textbf{T1:} Tác tử tối ưu hóa phân phối luồng, giảm $26.7\%$ MLU so với OSPF ($0.535$ vs $0.730$) với mức trễ tương đương ($10.8$ms vs $10.4$ms).
+    \item \textbf{T2:} Giờ cao điểm khiến OSPF nghẽn cục bộ ($4.14\%$ mất gói); RL chuyển hướng thông minh giúp giảm mất gói 6.6 lần (xuống $0.62\%$).
+    \item \textbf{T3:} OSPF dồn luồng vào trục chính gây nghẽn nghiêm trọng (MLU $0.917$, mất gói $16.66\%$). Tác tử RL phân bổ luồng qua các tuyến dự phòng vòng quanh châu Âu, hạ MLU xuống $0.672$ và \textbf{xóa sổ hoàn toàn $16.7\%$ mất gói}.
+    \item \textbf{T4:} Đợt dồn tải $5\times$ được dập tắt chỉ sau 1 chu kỳ điều khiển, đường MLU phẳng mịn không dao động.
+    \item \textbf{T5:} Khi liên kết huyết mạch (4, 7) đứt, tác tử tự động chuyển luồng với tỷ lệ mất gói bằng $0.00\%$, MLU thấp hơn OSPF $9.4\%$.
+    \item \textbf{T6:} Dưới áp lực khắc nghiệt nhất, OSPF mất $23.93\%$ gói và trễ $26.7$ms; tác tử giảm $45\%$ độ trễ ($14.8$ms) và giảm hơn 3 lần tỷ lệ mất gói.
+\end{itemize}
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=0.72\textwidth]{figures/overview_geant_mlu.png}
+    \caption{Diễn biến MLU qua 6 kịch bản trên mạng GÉANT giữa OSPF và Tác tử FL+RL.}
+    \label{fig:overview_geant}
+\end{figure}
+
+\subsection{Trường hợp 3: Đánh giá Toàn cảnh trên Mạng Abilene (12 nút, 30 liên kết) -- So sánh Đối đầu Nội miền và Chuyển giao}
+Hình \ref{fig:overview_abilene} đối sánh trực tiếp 3 chính sách: OSPF (xanh dương), Trained In-Domain Agent (xanh lá), và GEANT Transfer Agent (tím):
+\begin{itemize}
+    \item \textbf{T1 \& T2:} Nhờ bộ kiểm định tải dự phóng, mô hình chuyển giao (GEANT Transfer) bám sát đường OSPF với tỷ lệ Churn $0.00\%$, loại bỏ trễ dư thừa và rung giật.
+    \item \textbf{T3:} Khi tải tăng lũy tiến, OSPF tăng vọt lên $0.85$. Cả mô hình nội miền lẫn mô hình chuyển giao đều cắt giảm MLU xuống $\le 0.70$. Đáng chú ý, GEANT Transfer đạt kết quả xuất sắc nhất: giảm mất gói từ $21.62\%$ (OSPF) xuống chỉ còn $13.59\%$ và trễ chỉ $20.28$ms, vượt trội so với cả mô hình nội miền.
+    \item \textbf{T4:} Dưới đợt flash crowd cực đoan, đường biểu diễn của GEANT Transfer hoàn toàn phẳng mượt, không hề xuất hiện hiện tượng giật cục răng cưa (oscillations), chứng minh thuật toán kiểm định tải dự phóng đã triệt tiêu hoàn toàn dao động tuyến.
+    \item \textbf{T5:} Sự cố đứt liên kết (2, 3) được điều hướng êm thuận, GEANT Transfer duy trì MLU thấp hơn OSPF $12\%$.
+    \item \textbf{T6:} Cả hai mô hình AI kiểm soát tải cân bằng và ổn định, khẳng định khả năng tổng quát hóa vượt trội của mô hình chuyển giao không mẫu mà không cần tốn tài nguyên huấn luyện lại.
+\end{itemize}
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=0.72\textwidth]{figures/overview_abilene_mlu.png}
+    \caption{Diễn biến MLU qua 6 kịch bản trên mạng Abilene: OSPF vs. Trained In-Domain vs. GEANT Transfer.}
+    \label{fig:overview_abilene}
+\end{figure}
+
+\vspace{0.4cm}
+
+% ==============================================================================
+% PHẦN IV
 % ==============================================================================
 \section{Kế hoạch Triển khai Tiếp theo}
 \begin{enumerate}
