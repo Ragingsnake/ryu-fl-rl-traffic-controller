@@ -41,3 +41,9 @@ results/
 
 # Untracked critique
 KIET_BRANCH_CRITIQUE_AND_COMPARISON.md
+
+# LaTeX build files
+*.aux
+*.out
+*.toc
+*.synctex.gz
