@@ -172,8 +172,9 @@ def make_transfer_policy(agent, src_edges: int, src_managed: int, with_ospf_fall
         if not with_ospf_fallback:
             return raw_action
 
-        # Safe Transfer Routing:
-        # Flow-local congestion detection + RFC 2439 route flap damping (min 3 steps hold)
+        tm = env.tm_data[env.time_index]
+        disabled = getattr(env, "disabled_links", set())
+
         for k in range(n_m):
             chosen_p = int(raw_action[k])
             u, v = env.managed_od_pairs[k]
@@ -182,30 +183,44 @@ def make_transfer_policy(agent, src_edges: int, src_managed: int, with_ospf_fall
                 current_action[0][k] = 0
                 continue
 
-            p0_edges = [(paths[0][i], paths[0][i + 1]) for i in range(len(paths[0]) - 1)]
-            p0_has_failure = any(e in getattr(env, "disabled_links", set()) for e in p0_edges)
+            demand = tm[u, v]
+            p0 = paths[0]
+            p0_edges = [(p0[i], p0[i + 1]) for i in range(len(p0) - 1)]
+            p0_has_fail = any(e in disabled for e in p0_edges)
             p0_utils = [obs[env.edge_to_idx[e]] for e in p0_edges if e in env.edge_to_idx]
             max_p0 = max(p0_utils) if p0_utils else 0.0
 
-            cand_edges = [(paths[chosen_p][i], paths[chosen_p][i + 1]) for i in range(len(paths[chosen_p]) - 1)]
-            cand_has_failure = any(e in getattr(env, "disabled_links", set()) for e in cand_edges)
-            cand_utils = [obs[env.edge_to_idx[e]] for e in cand_edges if e in env.edge_to_idx]
-            max_cand = max(cand_utils) if cand_utils else 1.0
-
             curr_p = current_action[0][k]
+
             if curr_p == 0:
-                # Flow-local trigger: Only detour if flow k's own path p0 is stressed (>= 0.72) or failed
-                if (max_p0 >= 0.72 or p0_has_failure) and (chosen_p != 0) and not cand_has_failure:
-                    if (max_cand < max_p0 - 0.03) or p0_has_failure:
+                # If path 0 is severely congested (>= 0.78) or broken, look for candidate
+                if (max_p0 >= 0.78 or p0_has_fail) and (chosen_p != 0):
+                    cand = paths[chosen_p]
+                    cand_edges = [(cand[i], cand[i + 1]) for i in range(len(cand) - 1)]
+                    cand_has_fail = any(e in disabled for e in cand_edges)
+                    cand_utils = [obs[env.edge_to_idx[e]] for e in cand_edges if e in env.edge_to_idx]
+                    cand_caps = [env.topology[e[0]][e[1]]["capacity"] for e in cand_edges]
+                    proj_cand = max([u_val + (demand / c) for u_val, c in zip(cand_utils, cand_caps)]) if cand_utils else 1.0
+
+                    if not cand_has_fail and (proj_cand < max_p0 - 0.02 or p0_has_fail):
                         current_action[0][k] = chosen_p
                         hold_count[0][k] = 0
             else:
-                # If currently detoured, hold for at least 3 steps to eliminate limit-cycle thrashing
-                if cand_has_failure:
+                # Flow is on a detour. Check if candidate path failed
+                curr_path = paths[curr_p]
+                curr_edges = [(curr_path[i], curr_path[i + 1]) for i in range(len(curr_path) - 1)]
+                curr_has_fail = any(e in disabled for e in curr_edges)
+
+                # Projected load on Path 0 if flow returns (load = background + demand / capacity)
+                p0_caps = [env.topology[e[0]][e[1]]["capacity"] for e in p0_edges]
+                projected_p0 = max([u_val + (demand / c) for u_val, c in zip(p0_utils, p0_caps)]) if p0_utils else 0.0
+
+                if curr_has_fail:
                     current_action[0][k] = 0
                     hold_count[0][k] = 0
-                elif hold_count[0][k] >= 3:
-                    if (max_p0 < 0.55 and not p0_has_failure) or (max_cand > max_p0 + 0.05):
+                elif hold_count[0][k] >= 15:  # Hold for at least 15 steps during traffic surge
+                    # Only return if Path 0 can absorb the flow WITHOUT re-congesting!
+                    if projected_p0 < 0.72 and not p0_has_fail:
                         current_action[0][k] = 0
                         hold_count[0][k] = 0
 
