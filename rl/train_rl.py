@@ -135,14 +135,31 @@ def main():
         print(f"SubprocVecEnv failed: {e}. Falling back to DummyVecEnv.")
         vec_env = make_vec_env(make_env, n_envs=args.n_envs, vec_env_cls=DummyVecEnv)
 
+    from stable_baselines3.common.callbacks import BaseCallback, CallbackList
+
+    class PeriodicSaveCallback(BaseCallback):
+        def __init__(self, save_path: str, save_freq_timesteps: int = 10000, n_envs: int = 4, verbose: int = 1):
+            super().__init__(verbose)
+            self.save_path = save_path
+            self.save_freq = max(1, save_freq_timesteps // n_envs)
+
+        def _on_step(self) -> bool:
+            if self.n_calls % self.save_freq == 0:
+                self.model.save(self.save_path)
+                if self.verbose > 0:
+                    print(f"\n[Auto-Save] Model checkpoint saved to {self.save_path} at step {self.num_timesteps}.")
+            return True
+
     default_log_dir = os.path.join(args.log_dir, topo)
     default_demo_dir = os.path.join("results/demo", topo)
-    callback = MetricsCallback(
+    metrics_cb = MetricsCallback(
         log_dir=default_log_dir,
         output_dir=default_demo_dir,
         title_suffix=topo.upper(),
         verbose=1,
     )
+    checkpoint_cb = PeriodicSaveCallback(save_path=save_path, save_freq_timesteps=10000, n_envs=args.n_envs, verbose=1)
+    callback = CallbackList([metrics_cb, checkpoint_cb])
 
     policy_kwargs = {"net_arch": {"pi": [256, 128], "vf": [256, 128]}}
 
