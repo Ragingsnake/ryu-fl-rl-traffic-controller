@@ -192,9 +192,12 @@ def make_transfer_policy(agent, src_edges: int, src_managed: int, with_ospf_fall
 
             curr_p = current_action[0][k]
 
+            thresh = 0.65 if len(env.topology.nodes) == 14 else 0.75
+            return_thresh = thresh - 0.05
+
             if curr_p == 0:
-                # If path 0 is severely congested (>= 0.78) or broken, look for candidate
-                if (max_p0 >= 0.78 or p0_has_fail) and (chosen_p != 0):
+                # If path 0 is congested (>= thresh per topology) or broken, look for candidate
+                if (max_p0 >= thresh or p0_has_fail) and (chosen_p != 0):
                     cand = paths[chosen_p]
                     cand_edges = [(cand[i], cand[i + 1]) for i in range(len(cand) - 1)]
                     cand_has_fail = any(e in disabled for e in cand_edges)
@@ -220,7 +223,7 @@ def make_transfer_policy(agent, src_edges: int, src_managed: int, with_ospf_fall
                     hold_count[0][k] = 0
                 elif hold_count[0][k] >= 15:  # Hold for at least 15 steps during traffic surge
                     # Only return if Path 0 can absorb the flow WITHOUT re-congesting!
-                    if projected_p0 < 0.72 and not p0_has_fail:
+                    if projected_p0 < return_thresh and not p0_has_fail:
                         current_action[0][k] = 0
                         hold_count[0][k] = 0
 
@@ -365,43 +368,10 @@ def run_demo_for_topology(topology: str, args, base_results_dir: Path):
                             deterministic=True,
                         )
                         ep_start[0] = False
-                        action = raw_action[: env.num_managed].copy()
-                        if len(getattr(env, "disabled_links", set())) > 0 and topology == "geant":
-                            action[:] = 0
-                        return action
+                        return raw_action[: env.num_managed]
 
                     raw_action, _ = trained_agent.predict(obs, deterministic=True)
-                    raw_action = raw_action[: env.num_managed]
-
-                    final_action = np.zeros(env.num_managed, dtype=np.int32)
-                    has_failure = len(getattr(env, "disabled_links", set())) > 0
-                    net_mlu = np.max(obs[: env.num_edges]) if len(obs) >= env.num_edges else 0.0
-
-                    for k in range(env.num_managed):
-                        chosen_p = int(raw_action[k])
-                        if chosen_p == 0:
-                            continue
-                        u, v = env.managed_od_pairs[k]
-                        paths = env.path_table.get((u, v), [])
-                        if len(paths) <= chosen_p or len(paths[0]) == 0 or len(paths[chosen_p]) == 0:
-                            continue
-
-                        p0_edges = [(paths[0][i], paths[0][i + 1]) for i in range(len(paths[0]) - 1)]
-                        p0_utils = [obs[env.edge_to_idx[e]] for e in p0_edges if e in env.edge_to_idx]
-                        max_p0 = max(p0_utils) if p0_utils else 0.0
-
-                        # Proactive TE threshold: if primary path stressed, network in surge, or link failed
-                        if (max_p0 >= 0.55) or (net_mlu >= 0.70) or has_failure:
-                            cand_edges = [
-                                (paths[chosen_p][i], paths[chosen_p][i + 1]) for i in range(len(paths[chosen_p]) - 1)
-                            ]
-                            cand_utils = [obs[env.edge_to_idx[e]] for e in cand_edges if e in env.edge_to_idx]
-                            max_cand = max(cand_utils) if cand_utils else 1.0
-
-                            if max_cand <= max_p0 + 0.12:
-                                final_action[k] = chosen_p
-
-                    return final_action
+                    return raw_action[: env.num_managed]
                 except Exception:
                     return np.zeros(env.num_managed, dtype=np.int32)
 
@@ -419,7 +389,7 @@ def run_demo_for_topology(topology: str, args, base_results_dir: Path):
     policies["Trained"] = policy_trained
 
     # If topology is abilene and geant model is available, include GEANT Transfer policy
-    if topology == "abilene" and os.path.exists("models/ppo_agent_geant.zip"):
+    if (topology == "abilene" or (topology == "nsfnet" and getattr(args, "cross_eval", False))) and os.path.exists("models/ppo_agent_geant.zip"):
         try:
             try:
                 from sb3_contrib import RecurrentPPO
@@ -430,9 +400,26 @@ def run_demo_for_topology(topology: str, args, base_results_dir: Path):
             policies["GEANT Transfer"] = make_transfer_policy(
                 geant_model, src_edges=72, src_managed=30, with_ospf_fallback=True
             )
-            print("[ABILENE] Added 'GEANT Transfer' policy (GÉANT PPO with OSPF fallback) to evaluation!")
+            print(f"[{topology.upper()}] Added 'GEANT Transfer' policy (GÉANT PPO with OSPF fallback) to evaluation!")
         except Exception as e:
-            print(f"[ABILENE] Could not load GEANT model for transfer: {e}")
+            print(f"[{topology.upper()}] Could not load GEANT model for transfer: {e}")
+
+    # If a fine-tuned GEANT model exists for this topology, include it in evaluation
+    finetuned_path = f"models/ppo_agent_geant_finetuned_{topology}.zip"
+    if os.path.exists(finetuned_path):
+        try:
+            try:
+                from sb3_contrib import RecurrentPPO
+
+                finetuned_model = RecurrentPPO.load(finetuned_path, custom_objects=custom_objects)
+            except Exception:
+                finetuned_model = PPO.load(finetuned_path, custom_objects=custom_objects)
+            policies["GEANT Finetuned"] = make_transfer_policy(
+                finetuned_model, src_edges=72, src_managed=30, with_ospf_fallback=True
+            )
+            print(f"[{topology.upper()}] Added 'GEANT Finetuned' policy to evaluation!")
+        except Exception as e:
+            print(f"[{topology.upper()}] Could not load fine-tuned model: {e}")
 
     active_policy_names = list(policies.keys())
 
@@ -466,12 +453,14 @@ def run_demo_for_topology(topology: str, args, base_results_dir: Path):
         "Random": "Untrained (Random)",
         "Trained": "Trained FL+RL Agent",
         "GEANT Transfer": "GEANT Transferred (Fallback)",
+        "GEANT Finetuned": "GEANT Finetuned (Few-shot)",
     }
     policy_plot_labels = {
         "OSPF": "OSPF-SPF",
         "Random": "Random Policy",
         "Trained": "Trained FL+RL",
         "GEANT Transfer": "GEANT Transfer",
+        "GEANT Finetuned": "GEANT Finetuned",
     }
 
     def get_policy_label(p_name):
@@ -538,24 +527,28 @@ def run_demo_for_topology(topology: str, args, base_results_dir: Path):
         "Random": "#ff7f0e",
         "Trained": "#2ca02c",
         "GEANT Transfer": "#9467bd",
+        "GEANT Finetuned": "#d62728",
     }
     styles = {
         "OSPF": "-",
         "Random": "--",
         "Trained": "-",
         "GEANT Transfer": "-.",
+        "GEANT Finetuned": "--",
     }
     widths = {
         "OSPF": 1.8,
         "Random": 1.2,
         "Trained": 2.2,
         "GEANT Transfer": 2.0,
+        "GEANT Finetuned": 2.2,
     }
     alphas = {
         "OSPF": 0.9,
         "Random": 0.6,
         "Trained": 1.0,
         "GEANT Transfer": 0.9,
+        "GEANT Finetuned": 0.95,
     }
 
     # 1. Five-Panel Timelines for All Metrics (Averaged across seeds with std shading)
@@ -880,7 +873,7 @@ def run_demo():
         choices=["all", "nsfnet", "geant", "abilene"],
         help="Topology to evaluate: nsfnet, geant, abilene, or all",
     )
-    parser.add_argument("--cross_eval", action="store_true", help="Explicitly test GEANT-trained model on Abilene")
+    parser.add_argument("--cross_eval", action="store_true", help="Explicitly test GEANT-trained model across other topologies (Abilene/NSFNET)")
     parser.add_argument("--seeds", nargs="+", type=int, default=[42, 43, 44, 45, 46], help="Random seeds for testing")
     parser.add_argument("--steps", type=int, default=100, help="Timesteps per episode")
     parser.add_argument("--out_dir", type=str, default="results/demo", help="Base directory to save generated plots")

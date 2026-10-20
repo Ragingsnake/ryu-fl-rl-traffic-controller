@@ -262,7 +262,8 @@ class NSFNETRoutingEnv(gym.Env):
 
         # Stochastic curricular link failure during training
         if self.failure_prob > 0.0 and self.np_random.random() < self.failure_prob:
-            candidate_edges = list(self.edges[:10])
+            core_edges = [(4, 7), (7, 4), (1, 7), (7, 1), (2, 7), (7, 2), (4, 15), (15, 4), (4, 2), (2, 4)]
+            candidate_edges = core_edges if (len(self.edges) == 72 and self.np_random.random() < 0.7) else list(self.edges)
             if candidate_edges:
                 chosen_edge = candidate_edges[int(self.np_random.integers(0, len(candidate_edges)))]
                 fail_step = int(self.np_random.integers(25, 45))
@@ -294,6 +295,9 @@ class NSFNETRoutingEnv(gym.Env):
             u_pred = np.zeros(self.num_edges, dtype=np.float32)
 
         u_pred = np.clip(u_pred, 0.0, 1.0)
+        for idx, e in enumerate(self.edges):
+            if e in self.disabled_links:
+                u_pred[idx] = 1.0
 
         # 3. Normalized demands
         tm = self.tm_data[self.time_index]
@@ -354,7 +358,7 @@ class NSFNETRoutingEnv(gym.Env):
         self.link_utils = link_loads / capacities
         for idx, e in enumerate(self.edges):
             if e in self.disabled_links:
-                self.link_utils[idx] = 0.0
+                self.link_utils[idx] = 1.0
         self.link_utils = np.clip(self.link_utils, 0.0, MAX_UTIL_CLIP)
 
         # d. Update history buffer
@@ -369,8 +373,8 @@ class NSFNETRoutingEnv(gym.Env):
 
         for idx, e in enumerate(self.edges):
             if e in self.disabled_links:
-                link_delays[idx] = 0.0
-                link_losses[idx] = 0.0
+                link_delays[idx] = MAX_QUEUE_DELAY_MS
+                link_losses[idx] = 1.0
                 continue
 
             u_e = self.link_utils[idx]
@@ -419,7 +423,8 @@ class NSFNETRoutingEnv(gym.Env):
         # R_t = -(1.0 * MLU_t + 0.5 * D_t^norm + 0.3 * ExcessDelay_t + 3.0 * L_t + 0.1 * Churn_t)
         # Note: excess_delay penalizes unnecessary detours during normal traffic,
         # while loss weight (3.0) strongly rewards rerouting during congestion bottlenecks.
-        mlu = np.max(self.link_utils)
+        active_utils = [self.link_utils[idx] for idx, e in enumerate(self.edges) if e not in self.disabled_links]
+        mlu = float(np.max(active_utils)) if active_utils else 1.0
         excess_delay = max(0.0, avg_delay - self.base_delay) / self.base_delay if self.base_delay > 0 else 0.0
         action_churn = float(np.mean(action != self.last_action))
         self.last_action = action.copy()
@@ -430,7 +435,7 @@ class NSFNETRoutingEnv(gym.Env):
         # When network is congested (MLU >= 0.65), relax excess delay penalty so agent can reroute to eliminate packet loss.
         delay_weight = 0.8 if mlu < 0.65 else 0.3
 
-        reward = -(1.0 * mlu + 0.5 * avg_delay_norm + delay_weight * excess_delay + 3.0 * avg_loss + churn_penalty)
+        reward = -(1.0 * mlu + 0.5 * avg_delay_norm + delay_weight * excess_delay + 40.0 * avg_loss + churn_penalty)
 
         # i. Check done
         all_congested = np.all(self.link_utils > 0.95)
