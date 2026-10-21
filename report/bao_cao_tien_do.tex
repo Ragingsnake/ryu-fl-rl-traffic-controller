@@ -64,14 +64,11 @@ Môi trường huấn luyện Gymnasium (\texttt{rl/env.py}) đã được xây 
 Dữ liệu được tiền xử lý và cắt lát theo cửa sổ trượt gồm 12 bước quá khứ ($T=12$, tương đương 3 giờ) để dự đoán 3 bước trong tương lai ($H=3$, tương đương 45 phút nhìn trước) và phân chia theo 3 miền mạng phục vụ huấn luyện FL. Đồng thời, chuỗi ma trận lưu lượng thực nghiệm của GÉANT và Abilene đã được chuẩn hóa để kiểm thử khả năng thích ứng và chuyển giao mô hình.
 
 \subsection{Xây dựng mô hình Federated Learning}
-Đã triển khai kiến trúc học liên kết để dự đoán lưu lượng mạng phân tán, đảm bảo tính riêng tư dữ liệu giữa các miền mạng:
+Đã triển khai kiến trúc học liên kết (Federated Learning) để dự đoán mức sử dụng liên kết mạng phân tán. Mỗi miền mạng đóng vai trò một Client huấn luyện mô hình cục bộ với hàm mất mát MSE và bộ tối ưu hóa Adam, chỉ gửi sai phân trọng số cập nhật lên máy chủ trung tâm mà không chia sẻ dữ liệu gốc, đảm bảo tính riêng tư tuyệt đối cho ma trận lưu lượng.
 
-\begin{itemize}[leftmargin=1.5em, itemsep=0.2ex]
-    \item \textbf{Cấu trúc mô hình dự báo (\texttt{TrafficLSTM}):} Gồm 2 tầng LSTM hồi quy (kích thước ẩn 64, dropout 0.2), nhận đầu vào là chuỗi 12 bước thời gian quá khứ (3 giờ) để dự báo mức tải liên kết cho 3 bước tương lai (45 phút); áp dụng kỹ thuật đệm số 0 (Dynamic Feature Padding) để đồng bộ kích thước đặc trưng giữa các miền mạng khác nhau.
-    \item \textbf{Quy trình huấn luyện cục bộ tại Client:} Mỗi Client huấn luyện mô hình trên dữ liệu tải liên kết nội bộ bằng hàm mất mát sai số toàn phương trung bình (MSE) và bộ tối ưu hóa Adam (tốc độ học 0.001), chỉ gửi sai phân trọng số cập nhật lên máy chủ trung tâm mà không chia sẻ dữ liệu gốc.
-    \item \textbf{Thuật toán tổng hợp FedAdam trên Server:} Máy chủ áp dụng thuật toán tổng hợp FedAdam tích hợp động lượng thích nghi nhằm khắc phục hiện tượng trôi trọng số do dữ liệu giữa các miền bị lệch phân phối (Non-IID), đạt sai số dự báo MAE $< 0.05$ và được lưu tại \texttt{models/fl\_global\_model.pt}.
-    \item \textbf{Cơ chế cầu nối FL $\to$ RL (\texttt{DomainPredictor}):} Duy trì bộ đệm trượt 12 bước để trích xuất và dự báo mức tải liên kết thời gian thực (thời gian suy luận $< 5$ ms trên CPU), cung cấp vector dự báo $u_{pred}$ trực tiếp cho không gian quan sát của tác tử RL.
-\end{itemize}
+Về cấu trúc mạng, mô hình dự báo TrafficLSTM gồm 2 tầng LSTM hồi quy (kích thước ẩn 64, dropout 0.2), nhận đầu vào là chuỗi 12 bước thời gian quá khứ (3 giờ) để dự báo mức tải liên kết cho 3 bước tương lai (45 phút). Hệ thống áp dụng kỹ thuật đệm số 0 (Dynamic Feature Padding) để đồng bộ hóa kích thước đặc trưng giữa các miền mạng có số lượng liên kết khác nhau.
+
+Về thuật toán tổng hợp, máy chủ FL Server áp dụng thuật toán FedAdam tích hợp động lượng thích nghi nhằm khắc phục hiện tượng trôi trọng số do dữ liệu giữa các miền bị lệch phân phối (Non-IID), đạt sai số dự báo MAE $< 0.05$ và được lưu tại \texttt{models/fl\_global\_model.pt}. Đồng thời, mô-đun DomainPredictor duy trì bộ đệm trượt 12 bước để suy luận thời gian thực và nạp trực tiếp vector dự báo tải $u_{pred}$ vào không gian quan sát của tác tử RL.
 
 \subsection{Xây dựng môi trường Reinforcement Learning}
 Đã hoàn thiện môi trường Gymnasium (\texttt{rl/env.py}) để phát triển và kiểm thử bài toán Traffic Engineering. Không gian trạng thái môi trường kết hợp giữa mức sử dụng hiện tại của các liên kết, mức sử dụng dự đoán 3 bước tương lai từ mô hình FL và nhu cầu lưu lượng tức thời.
