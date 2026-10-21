@@ -74,9 +74,29 @@ Dữ liệu được tiền xử lý và cắt lát theo cửa sổ trượt g�
 \subsection{Xây dựng mô hình Federated Learning}
 Đã triển khai mô hình 2 tầng LSTM để dự đoán lưu lượng mạng phân tán. Mỗi miền mạng sử dụng dữ liệu cục bộ để huấn luyện mô hình riêng và tuyệt đối không chia sẻ ma trận lưu lượng gốc ra bên ngoài, đảm bảo tính riêng tư của dữ liệu.
 
-Các mô hình cục bộ gửi sai phân trọng số $\Delta_t$ lên FL Server để tổng hợp. Thuật toán tổng hợp được sử dụng là FedAdam với động lượng thích nghi ($\beta_1 = 0.9, \beta_2 = 0.999$, tốc độ học $\eta = 0.01$) để tạo mô hình toàn cục. FedAdam khắc phục triệt để hiện tượng mất cân bằng dữ liệu giữa các miền mạng (Non-IID), giúp mô hình toàn cục hội tụ nhanh hơn nhiều so với FedAvg truyền thống và đạt sai số dự báo MAE $< 0.05$ trên tập kiểm thử.
+Cấu trúc mô hình mạng nơ-ron dự báo (\texttt{TrafficLSTM}):
+\begin{itemize}[leftmargin=1.5em, itemsep=0.2ex]
+    \item \textbf{Cấu trúc tầng mạng:} Đầu vào là tensor $X \in \mathbb{R}^{B \times T \times F_{in}}$ chứa chuỗi lịch sử $T = 12$ bước thời gian (tương đương 3 giờ quan sát), trong đó $F_{in}$ là số lượng liên kết của miền. Tín hiệu đi qua 2 tầng LSTM hồi quy với kích thước ẩn $\text{hidden\_size} = 64$, cấu hình \texttt{batch\_first=True}, kết hợp tầng \texttt{Dropout(0.2)} chống quá khớp. Trạng thái ẩn tại bước thời gian cuối $h_T \in \mathbb{R}^{B \times 64}$ được đưa qua tầng tuyến tính đầu ra $\text{Linear}(64, H \times F_{in})$ với tầm dự báo $H = 3$ bước (nhìn trước 45 phút), sau đó chuyển đổi về tensor đầu ra $\hat{Y} \in \mathbb{R}^{B \times H \times F_{in}}$ chuẩn hóa trong thang đo $[0.0, 1.0]$.
+    \item \textbf{Căn chỉnh đặc trưng đa miền (Dynamic Feature Padding):} Nhằm xử lý sự chênh lệch số lượng liên kết giữa các miền trong topo (ví dụ các miền của NSFNET, GÉANT, Abilene), hệ thống đệm số 0 (zero-padding) về kích thước cực đại $\text{MAX\_F\_IN}$, giúp mô hình toàn cục tổng quát hóa và chia sẻ trọng số nhất quán.
+\end{itemize}
 
-Mô hình sau khi huấn luyện được lưu tại \texttt{models/fl\_global\_model.pt}. Cấu trúc mô hình gọn nhẹ với khoảng 37.000 tham số và thời gian suy luận dưới 5 ms trên CPU, hoàn toàn đáp ứng yêu cầu phản xạ thời gian thực của bộ điều khiển SDN.
+Quy trình huấn luyện cục bộ và cấu trúc tổng hợp liên kết với FedAdam:
+\begin{itemize}[leftmargin=1.5em, itemsep=0.2ex]
+    \item \textbf{Huấn luyện tại Client:} Mỗi Client $k \in \{1, \dots, K\}$ huấn luyện mô hình trên dữ liệu tải liên kết nội bộ với hàm mất mát sai số toàn phương trung bình (MSE):
+    \begin{equation}
+        \mathcal{L}_{MSE} = \frac{1}{B \cdot H \cdot F_{in}} \sum_{b=1}^B \sum_{t=1}^H \sum_{j=1}^{F_{in}} (y_{b,t,j} - \hat{y}_{b,t,j})^2
+    \end{equation}
+    sử dụng bộ tối ưu hóa Adam với tốc độ học cục bộ $\eta_L = 0.001$. Client chỉ gửi sai phân trọng số $\Delta_k^t = w_k^t - w^t$ lên máy chủ trung tâm.
+    \item \textbf{Thuật toán tổng hợp FedAdam trên Server:} Nhằm khắc phục hiện tượng trôi trọng số (\textit{client drift}) do dữ liệu giữa các miền mạng bị lệch phân phối (\textit{Non-IID}), máy chủ tổng hợp FL Server áp dụng thuật toán FedAdam với động lượng thích nghi:
+    \begin{align}
+        \Delta_t &= \sum_{k=1}^K \frac{n_k}{n} \Delta_k^t \\
+        m_t &= \beta_1 m_{t-1} + (1 - \beta_1) \Delta_t \\
+        v_t &= \beta_2 v_{t-1} + (1 - \beta_2) \Delta_t^2 \\
+        w^{t+1} &= w^t + \eta \frac{m_t}{\sqrt{v_t} + \epsilon}
+    \end{align}
+    với các siêu tham số máy chủ: $\beta_1 = 0.9, \beta_2 = 0.999$, tốc độ học $\eta = 0.01$, và hằng số làm mịn $\epsilon = 10^{-3}$. Mô hình toàn cục đạt sai số dự báo $\text{MAE} < 0.05$ trên tập kiểm thử và được lưu tại \texttt{models/fl\_global\_model.pt}.
+    \item \textbf{Cơ chế cầu nối FL $\to$ RL (\texttt{DomainPredictor}):} Hàng đệm trượt 12 bước lưu trữ mức sử dụng liên kết thu thập từ Ryu Controller. Tại mỗi chu kỳ điều khiển, bộ điều phối \texttt{DomainPredictor} trích xuất vector tải của từng miền, gọi suy luận qua mô hình toàn cục (thời gian suy luận $< 5$ ms trên CPU), ghép nối thành vector dự báo hoàn chỉnh $u_{pred}$ (42 liên kết NSFNET, 72 liên kết GÉANT, 30 liên kết Abilene) để nạp thẳng vào vector quan sát trạng thái của tác tử RL.
+\end{itemize}
 
 \subsection{Xây dựng môi trường Reinforcement Learning}
 Đã hoàn thiện môi trường Gymnasium (\texttt{rl/env.py}) để phát triển và kiểm thử bài toán Traffic Engineering trước khi tích hợp điều khiển mạng SDN. Không gian trạng thái môi trường kết hợp giữa mức sử dụng hiện tại của các liên kết, mức sử dụng dự đoán 3 bước tương lai từ mô hình FL và nhu cầu lưu lượng tức thời.

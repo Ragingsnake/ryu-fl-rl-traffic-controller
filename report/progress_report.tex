@@ -158,7 +158,18 @@ Mục này trình bày chi tiết cách thức nhóm đã tiếp thu, giải quy
 \end{figure}
 
 \subsection{Kiến trúc Truyền thông và Tổng hợp Liên kết Đa miền với FedAdam}
-\textbf{Giải pháp đã hoàn thiện:} Đã bổ sung sơ đồ tương tác đa miền của Federated Learning (Hình \ref{fig:fl_flow}). Thể hiện rõ: mỗi miền mạng là một Client thu thập tải liên kết cục bộ, gửi sai phân trọng số $\Delta_t$ lên FL Server; Server áp dụng thuật toán FedAdam cập nhật trọng số toàn cục và phân phối lại mà không bao giờ truyền dữ liệu lưu lượng thô.
+\textbf{Giải pháp đã hoàn thiện:} Đã bổ sung sơ đồ tương tác đa miền của Federated Learning (Hình \ref{fig:fl_flow}) và chuẩn hóa thuật toán tối ưu hóa thích nghi FedAdam.
+
+Mỗi miền mạng hoạt động như một Client độc lập, thu thập chuỗi thời gian mức sử dụng liên kết nội bộ và tối ưu hóa mô hình cục bộ bằng bộ tối ưu Adam ($\eta_L = 0.001$). Thay vì truyền dữ liệu lưu lượng thô ra ngoài mạng, Client chỉ gửi sai phân tham số mô hình $\Delta_k^t = w_k^t - w^t$ lên FL Server sau mỗi vòng huấn luyện.
+
+Trên FL Server, để khắc phục triệt để hiện tượng trôi trọng số (\textit{client drift}) do dữ liệu phi tập trung và phân phối lệch miền (\textit{Non-IID}), thuật toán FedAdam cập nhật trọng số mô hình toàn cục thông qua động lượng thích nghi:
+\begin{align}
+    \Delta_t &= \sum_{k=1}^K \frac{n_k}{n} \Delta_k^t \\
+    m_t &= \beta_1 m_{t-1} + (1 - \beta_1) \Delta_t \\
+    v_t &= \beta_2 v_{t-1} + (1 - \beta_2) \Delta_t^2 \\
+    w^{t+1} &= w^t + \eta \frac{m_t}{\sqrt{v_t} + \epsilon}
+\end{align}
+trong đó các siêu tham số máy chủ được thiết lập tối ưu: $\beta_1 = 0.9$ (động lượng bậc một), $\beta_2 = 0.999$ (động lượng bậc hai), tốc độ học toàn cục $\eta = 0.01$, và hằng số làm mịn $\epsilon = 10^{-3}$. Thuật toán đảm bảo mô hình toàn cục hội tụ mượt mà và nhanh hơn đáng kể so với FedAvg truyền thống.
 
 \begin{figure}[htbp]
     \centering
@@ -269,11 +280,22 @@ Trong mạng NSFNET có $14 \times 13 = 182$ cặp nút nguồn-đích. Nếu qu
 \end{figure}
 
 \subsection{Đặc tả Cấu trúc Đầu vào, Đầu ra và Thang đo của Mô hình FL}
-\textbf{Giải pháp đã hoàn thiện:} Đặc tả chính xác cấu trúc dữ liệu của mô hình FL:
+\textbf{Giải pháp đã hoàn thiện:} Đặc tả chính xác cấu trúc mạng nơ-ron và luồng dữ liệu của mô hình FL (\texttt{TrafficLSTM}):
 \begin{itemize}
-    \item \textbf{Đầu vào ($X$):} Tensor kích thước $[B, 12, |E_{domain}|]$ chứa chuỗi 12 bước thời gian lịch sử mức sử dụng liên kết (chu kỳ 15 phút, tổng cộng 3 giờ quan sát).
-    \item \textbf{Đầu ra ($\hat{Y}$):} Tensor kích thước $[B, 3, |E_{domain}|]$ dự báo mức sử dụng liên kết cho 3 bước tiếp theo (nhìn trước 45 phút).
-    \item \textbf{Thang đo và hàm mất mát:} Chuẩn hóa mức sử dụng về thang đo $[0.0, 1.0]$. Hàm mất mát huấn luyện là sai số toàn phương trung bình (MSE), đánh giá hiệu năng bằng MAE (Mean Absolute Error) và RMSE (Root Mean Square Error).
+    \item \textbf{Cấu trúc tầng mạng (\texttt{TrafficLSTM}):}
+    \begin{itemize}
+        \item \textit{Đầu vào ($X$):} Tensor kích thước $[B, 12, F_{in}]$ chứa chuỗi 12 bước thời gian lịch sử mức sử dụng liên kết ($T=12$, tương đương 3 giờ quan sát), trong đó $F_{in}$ là số lượng liên kết của miền mạng.
+        \item \textit{Tầng LSTM ẩn:} Gồm 2 tầng LSTM hồi quy với kích thước ẩn $\text{hidden\_size} = 64$, cấu hình \texttt{batch\_first=True}, kết hợp tầng \texttt{Dropout(0.2)} nhằm chống hiện tượng quá khớp (overfitting).
+        \item \textit{Tầng chiếu tuyến tính (Linear Projection Head):} Trạng thái ẩn của bước thời gian cuối cùng $h_{12} \in \mathbb{R}^{B \times 64}$ được đưa qua tầng kết nối đầy đủ $\text{Linear}(64, H \times F_{in})$ với tầm dự báo $H = 3$ bước thời gian tương lai.
+        \item \textit{Đầu ra ($\hat{Y}$):} Tensor kích thước $[B, 3, F_{in}]$ dự báo mức sử dụng liên kết cho 3 bước tiếp theo (nhìn trước 45 phút), được chuẩn hóa trong thang đo $[0.0, 1.0]$.
+    \end{itemize}
+    \item \textbf{Hàm mất mát và đánh giá:} Huấn luyện bằng sai số toàn phương trung bình (MSE):
+    \begin{equation}
+        \mathcal{L}_{MSE} = \frac{1}{B \cdot H \cdot F_{in}} \sum_{b=1}^B \sum_{t=1}^H \sum_{j=1}^{F_{in}} (y_{b,t,j} - \hat{y}_{b,t,j})^2
+    \end{equation}
+    và đánh giá chất lượng dự báo bằng các chỉ số MAE (Mean Absolute Error) và RMSE (Root Mean Square Error).
+    \item \textbf{Căn chỉnh đặc trưng đa miền (Dynamic Feature Padding):} Để đồng nhất số chiều đầu vào giữa các miền mạng có số lượng liên kết khác nhau, hệ thống đệm số 0 (zero-padding) về kích thước cực đại $\text{MAX\_F\_IN}$, đảm bảo mô hình toàn cục chia sẻ trọng số nhất quán.
+    \item \textbf{Cơ chế cầu nối FL $\to$ RL (\texttt{DomainPredictor}):} Hàng đệm trượt 12 bước lưu trữ viễn trắc tải liên kết từ Ryu Controller; tại mỗi chu kỳ điều khiển, bộ điều phối \texttt{DomainPredictor} trích xuất vector tải của từng miền, gọi mô hình toàn cục dự báo (độ trễ suy luận $< 5$ ms trên CPU), ghép nối thành vector dự báo hoàn chỉnh $u_{pred}$ (42 liên kết NSFNET, 72 liên kết GÉANT, 30 liên kết Abilene) để nạp trực tiếp vào không gian trạng thái của tác tử RL.
 \end{itemize}
 
 \subsection{Quy trình Suy luận Thời gian thực và Ra Quyết định Điều khiển}
