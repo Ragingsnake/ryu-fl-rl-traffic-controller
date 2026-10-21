@@ -46,7 +46,7 @@
     \hrule height 1pt
     \vspace{0.4cm}
     {\Large\bfseries BÁO CÁO TIẾN ĐỘ NỘI BỘ VÀ GIẢI QUYẾT PHẢN BIỆN}\\
-    {\large\bfseries ĐỀ TÀI KHÓA LUẬN TỐT NGHIỆP: HỆ THỐNG ĐỊNH TUYẾN CHỦ ĐỘNG SDN KẾT HỢP FEDERATED LEARNING VÀ REINFORCEMENT LEARNING}\\[0.2cm]
+    {\large\bfseries ĐỀ TÀI KHÓA LUẬN TỐT NGHIỆP: HỆ THỐNG ĐỊNH TUYẾN CHỦ ĐỘNG KẾT HỢP FEDERATED LEARNING VÀ REINFORCEMENT LEARNING}\\[0.2cm]
     \textit{Phiên bản cập nhật theo các góp ý phản biện của Giảng viên hướng dẫn}
     \vspace{0.3cm}
     \hrule height 0.5pt
@@ -69,11 +69,9 @@
 
 Hệ thống nguyên mẫu (\textbf{Prototype}) trong thư mục dự án hiện tại đã được hiện thực hóa hoàn chỉnh, kết nối liền mạch từ mặt phẳng dữ liệu OpenFlow đến các mô hình trí tuệ nhân tạo phân tán.
 
-\subsection{Hiện thực hóa Nền tảng Điều khiển và Môi trường Mô phỏng}
+\subsection{Hiện thực hóa Nền tảng Môi trường Mô phỏng}
 \begin{itemize}
     \item \textbf{Môi trường huấn luyện Gymnasium (\texttt{rl/env.py}):} Xây dựng môi trường định tuyến tùy chỉnh kế thừa \texttt{gym.Env}, tích hợp mô hình hàng đợi viễn thông M/M/1 để tính toán độ trễ lan truyền, độ trễ hàng đợi và tỷ lệ mất gói tức thời.
-    \item \textbf{Mặt phẳng điều khiển SDN (\texttt{sdn/ryu\_app.py}, \texttt{sdn/ai\_bridge.py}):} Triển khai bộ điều khiển Ryu OpenFlow 1.3 và cầu nối AI Bridge giao tiếp qua TCP Socket. Controller tự động thu thập thống kê port counters, nạp bảng luồng động và xử lý tái định tuyến thời gian thực.
-    \item \textbf{Mô phỏng mạng Mininet (\texttt{sdn/mininet\_topo.py}, \texttt{sdn/traffic\_orchestrator.py}):} Xây dựng topo ảo hóa khớp chính xác với topo vật lý, tự động tạo luồng lưu lượng nền và luồng bùng phát qua \texttt{iperf3}.
     \item \textbf{Tự động hóa Pipelines GitHub Actions (\texttt{.github/workflows/}):} Cấu hình 2 quy trình chạy thủ công (\texttt{workflow\_dispatch}): pipeline huấn luyện đa topo (\texttt{train.yml}) và pipeline đánh giá kiểm thử xuất artifact đồ thị (\texttt{test.yml}).
 \end{itemize}
 

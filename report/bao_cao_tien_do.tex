@@ -44,9 +44,9 @@
 % ==============================================================================
 \section{Nội dung đề tài}
 
-Đề tài tập trung nghiên cứu, thiết kế và hiện thực hóa hệ thống dự đoán lưu lượng và điều khiển lưu lượng chủ động (Traffic Engineering) trong mạng diện rộng dựa trên sự kết hợp giữa kiến trúc mạng điều khiển bằng phần mềm (SDN), học liên kết (Federated Learning) và học tăng cường sâu (Deep Reinforcement Learning).
+Đề tài tập trung nghiên cứu, thiết kế và hiện thực hóa hệ thống dự đoán lưu lượng và điều khiển lưu lượng chủ động (Traffic Engineering) trong mạng diện rộng dựa trên sự kết hợp giữa học liên kết (Federated Learning) và học tăng cường sâu (Deep Reinforcement Learning).
 
-Hệ thống tuân thủ mô hình phân tách ba tầng chuẩn của SDN, bao gồm mặt phẳng dữ liệu với các thiết bị chuyển mạch ảo hóa Open vSwitch và mô hình hàng đợi viễn thông M/M/1 trên các topo mạng thực tế; mặt phẳng điều khiển với bộ điều khiển Ryu OpenFlow 1.3 và mô-đun AI Bridge giao tiếp qua TCP Socket tốc độ cao để thu thập viễn trắc và nạp bảng luồng thời gian thực; cùng mặt phẳng trí tuệ nhân tạo tích hợp mô hình LSTM dự báo lưu lượng phân tán qua thuật toán FedAdam và tác tử RecurrentPPO ra quyết định chọn đường tối ưu trên tập K-Shortest Paths cho các luồng lưu lượng lớn, kết hợp cơ chế rơ-le trễ Schmitt-Trigger chống rung giật tuyến và cơ chế tự động chuyển hướng tức thời khi có sự cố đứt cáp.
+Mô hình học máy dự báo mức sử dụng liên kết từ dữ liệu phân tán tại các miền mạng thông qua thuật toán tổng hợp FedAdam mà không cần chia sẻ dữ liệu gốc, bảo đảm tính riêng tư. Tác tử RecurrentPPO kết hợp kết quả dự đoán với trạng thái mạng hiện tại để ra quyết định chọn đường tối ưu trên tập K-Shortest Paths cho các luồng lưu lượng lớn, kết hợp cơ chế rơ-le trễ Schmitt-Trigger chống rung giật tuyến và cơ chế tự động chuyển hướng tức thời khi có sự cố đứt liên kết nhằm tối ưu hóa hiệu quả sử dụng tài nguyên và nâng cao chất lượng dịch vụ.
 
 % ==============================================================================
 % 2. CÁC NỘI DUNG ĐÃ THỰC HIỆN
@@ -58,48 +58,23 @@ Hệ thống tuân thủ mô hình phân tách ba tầng chuẩn của SDN, bao 
 
 Môi trường huấn luyện Gymnasium (\texttt{rl/env.py}) đã được xây dựng hoàn chỉnh, tích hợp mô hình hàng đợi viễn thông M/M/1 để tính toán chính xác độ trễ lan truyền vật lý, độ trễ xếp hàng dựa trên mức độ chiếm dụng băng thông và xác định tỷ lệ mất gói tức thời khi hàng đợi vượt ngưỡng dung lượng.
 
-Đồng thời, nhóm đã hoàn thành việc tích hợp mặt phẳng điều khiển SDN: triển khai ứng dụng Ryu Controller OpenFlow 1.3 (\texttt{sdn/ryu\_app.py}) và mô-đun AI Bridge (\texttt{sdn/ai\_bridge.py}) giao tiếp qua TCP Socket để tự động thu thập thống kê port counters và nạp flow-mod thời gian thực; xây dựng môi trường Mininet ảo hóa (\texttt{sdn/mininet\_topo.py}, \texttt{sdn/traffic\_orchestrator.py}) với Open vSwitch khớp chính xác với topo vật lý, tự động điều phối \texttt{iperf3} để sinh tải nền và tiêm đột biến; thiết lập tự động hóa CI/CD với GitHub Actions (\texttt{train.yml}, \texttt{test.yml}) để tự động kiểm thử và xuất báo cáo kết quả.
-
 \subsection{Xây dựng dữ liệu lưu lượng mạng}
-Đã xây dựng và công thức hóa tường minh chương trình sinh dữ liệu theo Mô hình Hấp dẫn (Gravity Model) trong \texttt{data/generate\_tm.py}:
-\begin{equation}
-    B(u, v) = \alpha \cdot \frac{O_u \cdot A_v}{[d(u, v)]^\beta}, \quad \text{với } \beta = 0.8
-\end{equation}
-Hệ số tỷ lệ $\alpha$ được xác định tự động bằng thuật toán tìm kiếm nhị phân sao cho: khi toàn bộ mạng vận hành ở trạng thái cơ sở theo đường ngắn nhất OSPF, liên kết nút cổ chai đạt chính xác 85\% dung lượng tối đa (1 Gbps cho NSFNET/Abilene và 2.5 Gbps cho GÉANT).
-
-Dữ liệu mô phỏng đầy đủ các thành phần thực tế qua chu kỳ 4 tuần (bước nhảy 15 phút): sóng hình sin 24h ngày/đêm (biên độ 0.35), suy giảm tải ngày cuối tuần (-0.15), nhiễu ngẫu nhiên Gaussian $\mathcal{N}(0, 0.05^2)$, xác suất bùng phát tải cục bộ $P_{surge} = 0.25$ và xác suất đứt liên kết ngẫu nhiên $P_{fail} = 0.05$.
+Đã xây dựng chương trình sinh dữ liệu lưu lượng theo Mô hình Hấp dẫn (Gravity Model), mô phỏng chu kỳ ngày/đêm, suy giảm ngày cuối tuần, bùng phát tải cục bộ và sự cố đứt liên kết ngẫu nhiên qua chu kỳ 4 tuần với bước nhảy 15 phút.
 
 Dữ liệu được tiền xử lý và cắt lát theo cửa sổ trượt gồm 12 bước quá khứ ($T=12$, tương đương 3 giờ) để dự đoán 3 bước trong tương lai ($H=3$, tương đương 45 phút nhìn trước) và phân chia theo 3 miền mạng phục vụ huấn luyện FL. Đồng thời, chuỗi ma trận lưu lượng thực nghiệm của GÉANT và Abilene đã được chuẩn hóa để kiểm thử khả năng thích ứng và chuyển giao mô hình.
 
 \subsection{Xây dựng mô hình Federated Learning}
-Đã triển khai mô hình 2 tầng LSTM để dự đoán lưu lượng mạng phân tán. Mỗi miền mạng sử dụng dữ liệu cục bộ để huấn luyện mô hình riêng và tuyệt đối không chia sẻ ma trận lưu lượng gốc ra bên ngoài, đảm bảo tính riêng tư của dữ liệu.
+Đã triển khai kiến trúc học liên kết để dự đoán lưu lượng mạng phân tán, đảm bảo tính riêng tư dữ liệu giữa các miền mạng:
 
-Cấu trúc mô hình mạng nơ-ron dự báo (\texttt{TrafficLSTM}):
 \begin{itemize}[leftmargin=1.5em, itemsep=0.2ex]
-    \item \textbf{Cấu trúc tầng mạng:} Đầu vào là tensor $X \in \mathbb{R}^{B \times T \times F_{in}}$ chứa chuỗi lịch sử $T = 12$ bước thời gian (tương đương 3 giờ quan sát), trong đó $F_{in}$ là số lượng liên kết của miền. Tín hiệu đi qua 2 tầng LSTM hồi quy với kích thước ẩn $\text{hidden\_size} = 64$, cấu hình \texttt{batch\_first=True}, kết hợp tầng \texttt{Dropout(0.2)} chống quá khớp. Trạng thái ẩn tại bước thời gian cuối $h_T \in \mathbb{R}^{B \times 64}$ được đưa qua tầng tuyến tính đầu ra $\text{Linear}(64, H \times F_{in})$ với tầm dự báo $H = 3$ bước (nhìn trước 45 phút), sau đó chuyển đổi về tensor đầu ra $\hat{Y} \in \mathbb{R}^{B \times H \times F_{in}}$ chuẩn hóa trong thang đo $[0.0, 1.0]$.
-    \item \textbf{Căn chỉnh đặc trưng đa miền (Dynamic Feature Padding):} Nhằm xử lý sự chênh lệch số lượng liên kết giữa các miền trong topo (ví dụ các miền của NSFNET, GÉANT, Abilene), hệ thống đệm số 0 (zero-padding) về kích thước cực đại $\text{MAX\_F\_IN}$, giúp mô hình toàn cục tổng quát hóa và chia sẻ trọng số nhất quán.
-\end{itemize}
-
-Quy trình huấn luyện cục bộ và cấu trúc tổng hợp liên kết với FedAdam:
-\begin{itemize}[leftmargin=1.5em, itemsep=0.2ex]
-    \item \textbf{Huấn luyện tại Client:} Mỗi Client $k \in \{1, \dots, K\}$ huấn luyện mô hình trên dữ liệu tải liên kết nội bộ với hàm mất mát sai số toàn phương trung bình (MSE):
-    \begin{equation}
-        \mathcal{L}_{MSE} = \frac{1}{B \cdot H \cdot F_{in}} \sum_{b=1}^B \sum_{t=1}^H \sum_{j=1}^{F_{in}} (y_{b,t,j} - \hat{y}_{b,t,j})^2
-    \end{equation}
-    sử dụng bộ tối ưu hóa Adam với tốc độ học cục bộ $\eta_L = 0.001$. Client chỉ gửi sai phân trọng số $\Delta_k^t = w_k^t - w^t$ lên máy chủ trung tâm.
-    \item \textbf{Thuật toán tổng hợp FedAdam trên Server:} Nhằm khắc phục hiện tượng trôi trọng số (\textit{client drift}) do dữ liệu giữa các miền mạng bị lệch phân phối (\textit{Non-IID}), máy chủ tổng hợp FL Server áp dụng thuật toán FedAdam với động lượng thích nghi:
-    \begin{align}
-        \Delta_t &= \sum_{k=1}^K \frac{n_k}{n} \Delta_k^t \\
-        m_t &= \beta_1 m_{t-1} + (1 - \beta_1) \Delta_t \\
-        v_t &= \beta_2 v_{t-1} + (1 - \beta_2) \Delta_t^2 \\
-        w^{t+1} &= w^t + \eta \frac{m_t}{\sqrt{v_t} + \epsilon}
-    \end{align}
-    với các siêu tham số máy chủ: $\beta_1 = 0.9, \beta_2 = 0.999$, tốc độ học $\eta = 0.01$, và hằng số làm mịn $\epsilon = 10^{-3}$. Mô hình toàn cục đạt sai số dự báo $\text{MAE} < 0.05$ trên tập kiểm thử và được lưu tại \texttt{models/fl\_global\_model.pt}.
-    \item \textbf{Cơ chế cầu nối FL $\to$ RL (\texttt{DomainPredictor}):} Hàng đệm trượt 12 bước lưu trữ mức sử dụng liên kết thu thập từ Ryu Controller. Tại mỗi chu kỳ điều khiển, bộ điều phối \texttt{DomainPredictor} trích xuất vector tải của từng miền, gọi suy luận qua mô hình toàn cục (thời gian suy luận $< 5$ ms trên CPU), ghép nối thành vector dự báo hoàn chỉnh $u_{pred}$ (42 liên kết NSFNET, 72 liên kết GÉANT, 30 liên kết Abilene) để nạp thẳng vào vector quan sát trạng thái của tác tử RL.
+    \item \textbf{Cấu trúc mô hình dự báo (\texttt{TrafficLSTM}):} Gồm 2 tầng LSTM hồi quy (kích thước ẩn 64, dropout 0.2), nhận đầu vào là chuỗi 12 bước thời gian quá khứ (3 giờ) để dự báo mức tải liên kết cho 3 bước tương lai (45 phút); áp dụng kỹ thuật đệm số 0 (Dynamic Feature Padding) để đồng bộ kích thước đặc trưng giữa các miền mạng khác nhau.
+    \item \textbf{Quy trình huấn luyện cục bộ tại Client:} Mỗi Client huấn luyện mô hình trên dữ liệu tải liên kết nội bộ bằng hàm mất mát sai số toàn phương trung bình (MSE) và bộ tối ưu hóa Adam (tốc độ học 0.001), chỉ gửi sai phân trọng số cập nhật lên máy chủ trung tâm mà không chia sẻ dữ liệu gốc.
+    \item \textbf{Thuật toán tổng hợp FedAdam trên Server:} Máy chủ áp dụng thuật toán tổng hợp FedAdam tích hợp động lượng thích nghi nhằm khắc phục hiện tượng trôi trọng số do dữ liệu giữa các miền bị lệch phân phối (Non-IID), đạt sai số dự báo MAE $< 0.05$ và được lưu tại \texttt{models/fl\_global\_model.pt}.
+    \item \textbf{Cơ chế cầu nối FL $\to$ RL (\texttt{DomainPredictor}):} Duy trì bộ đệm trượt 12 bước để trích xuất và dự báo mức tải liên kết thời gian thực (thời gian suy luận $< 5$ ms trên CPU), cung cấp vector dự báo $u_{pred}$ trực tiếp cho không gian quan sát của tác tử RL.
 \end{itemize}
 
 \subsection{Xây dựng môi trường Reinforcement Learning}
-Đã hoàn thiện môi trường Gymnasium (\texttt{rl/env.py}) để phát triển và kiểm thử bài toán Traffic Engineering trước khi tích hợp điều khiển mạng SDN. Không gian trạng thái môi trường kết hợp giữa mức sử dụng hiện tại của các liên kết, mức sử dụng dự đoán 3 bước tương lai từ mô hình FL và nhu cầu lưu lượng tức thời.
+Đã hoàn thiện môi trường Gymnasium (\texttt{rl/env.py}) để phát triển và kiểm thử bài toán Traffic Engineering. Không gian trạng thái môi trường kết hợp giữa mức sử dụng hiện tại của các liên kết, mức sử dụng dự đoán 3 bước tương lai từ mô hình FL và nhu cầu lưu lượng tức thời.
 
 Về không gian hành động, hệ thống áp dụng triệt để Nguyên lý Pareto 80/20: thay vì quản lý toàn bộ các cặp nguồn–đích (gây bùng nổ tổ hợp lên $3^{182}$ trên NSFNET hay $3^{462}$ trên GÉANT), tác tử chỉ điều khiển nhóm $N_m$ cặp nguồn–đích có nhu cầu lớn nhất (Heavy-Hitters): 20 luồng trên NSFNET, 30 luồng trên GÉANT và 15 luồng trên Abilene. Top 10–15\% luồng này chiếm trên 85\% tổng lưu lượng toàn mạng và là nguyên nhân chính gây nghẽn. Với mỗi cặp, hệ thống chuẩn bị sẵn $K = 3$ đường đi không lặp vòng bằng thuật toán Yen (Tuyến 0: đường ngắn nhất OSPF; Tuyến 1 và 2: các tuyến vòng dự phòng); tác tử lựa chọn tuyến trong không gian \texttt{MultiDiscrete([3, 3, ..., 3])}. Các luồng nhỏ còn lại mặc định sử dụng Tuyến 0 OSPF.
 
@@ -139,7 +114,7 @@ Ngoài ra, nhóm đã hiện thực hóa cơ chế chuyển giao mô hình khôn
 
 Đến thời điểm hiện tại, hệ thống đã hoàn thành việc huấn luyện các mô hình trên cả 3 mạng và thực hiện đánh giá định lượng chi tiết so với OSPF:
 \begin{itemize}[leftmargin=1.5em, itemsep=0.3ex]
-    \item \textbf{Chuẩn hóa hạ tầng và mô hình:} Hoàn thành cấu hình 3 mạng (NSFNET, GÉANT, Abilene); tích hợp thành công bộ điều khiển Ryu OpenFlow 1.3 và môi trường Mininet qua AI Bridge.
+    \item \textbf{Chuẩn hóa hạ tầng và mô hình:} Hoàn thành cấu hình và mô phỏng hoàn chỉnh 3 mạng thực tế (NSFNET, GÉANT, Abilene) với mô hình hàng đợi viễn thông M/M/1.
     \item \textbf{Hiệu năng mô hình FL:} Mô hình FedAdam dự báo lưu lượng đa miền đạt sai số MAE $< 0.05$ trên tập kiểm thử.
     \item \textbf{Đặc tính hội tụ huấn luyện RecurrentPPO trên cả ba topo mạng:}
     Quá trình huấn luyện tác tử RecurrentPPO diễn ra ổn định và hội tụ vững chắc trên cả ba mạng. Trên mạng NSFNET (100k bước), phần thưởng tích lũy tăng đều từ -115 lên -85.2, explained variance đạt 0.892. Trên mạng GÉANT (204.8k bước), phần thưởng tăng trưởng mạnh từ -120 lên -72.1, explained variance đạt mức lý tưởng 0.983 và value loss giảm sâu về 0.234. Trên mạng Abilene (100k bước), mô hình hội tụ tại mức phần thưởng -87.9, explained variance 0.919, đóng vai trò mốc chuẩn đối sánh cơ sở (In-Domain Baseline) để đánh giá khả năng chuyển giao (Hình \ref{fig:training_all}).
@@ -254,7 +229,7 @@ Phân tích kết quả định lượng chi tiết trên mạng lõi GÉANT (H�
 \end{figure}
 
 \begin{itemize}[leftmargin=1.5em, itemsep=0.3ex]
-    \item \textbf{Giải quyết trọn vẹn 14 điểm phản biện của GVHD:} Đã tiếp thu, giải trình khoa học và tích hợp hoàn chỉnh 14 nội dung kỹ thuật vào hệ thống nguyên mẫu (kiến trúc 3 tầng SDN, sơ đồ truyền thông FL FedAdam, công thức Gravity Model, vai trò khoa học của LSTM và RecurrentPPO, chiến lược Pareto 80/20, chuẩn hóa hàm Reward thích nghi, thuật toán step logic, đồ thị hội tụ 3 mạng, quy trình suy luận thời gian thực, cơ chế chuyển giao đa topo và phân tích trade-off độ trễ).
+    \item \textbf{Giải quyết trọn vẹn 14 điểm phản biện của GVHD:} Đã tiếp thu, giải trình khoa học và tích hợp hoàn chỉnh 14 nội dung kỹ thuật vào hệ thống nguyên mẫu (mô hình mạng và hàng đợi M/M/1, cấu trúc FL FedAdam, mô hình Gravity Model, vai trò khoa học của LSTM và RecurrentPPO, chiến lược Pareto 80/20, chuẩn hóa hàm Reward thích nghi, thuật toán step logic, đồ thị hội tụ 3 mạng, quy trình suy luận thời gian thực, cơ chế chuyển giao đa topo và phân tích trade-off độ trễ).
 \end{itemize}
 
 Hệ thống hiện có thể chạy hoàn chỉnh pipeline thử nghiệm và đánh giá tự động bằng script \texttt{run\_full\_pipeline.py} và \texttt{demo.py}, kết nối trực tiếp giữa môi trường mô phỏng, mô-đun FL và tác tử PPO, xuất đầy đủ dữ liệu CSV và đồ thị trực quan so sánh với OSPF.
