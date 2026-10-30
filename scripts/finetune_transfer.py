@@ -280,12 +280,12 @@ def finetune_for_topology(target_topology: str, timesteps: int = 25000, n_envs: 
     print(f"[{target_topology.upper()}] Loading source GÉANT model...")
     model = RecurrentPPO.load(source_model_path, env=vec_env)
 
-    # Re-initialize learning rate schedule and parameter groups for fine-tuning
-    initial_lr = 2.0e-4
-    model.lr_schedule = linear_schedule(initial_lr, 3e-5)
+    # Re-initialize learning rate schedule and parameter groups for smooth fine-tuning
+    initial_lr = 1.0e-4
+    model.lr_schedule = linear_schedule(initial_lr, 1.5e-5)
     for param_group in model.policy.optimizer.param_groups:
         param_group["lr"] = initial_lr
-    model.ent_coef = 0.015
+    model.ent_coef = 0.003
 
     eval_callback = TransferEvalCallback(target_topology=target_topology, check_freq=2500)
 
@@ -314,7 +314,7 @@ def main():
         choices=["nsfnet", "abilene", "all"],
         help="Target topology to fine-tune on",
     )
-    parser.add_argument("--timesteps", type=int, default=25000, help="Timesteps for fine-tuning (default: 25000)")
+    parser.add_argument("--timesteps", type=int, default=60000, help="Timesteps for fine-tuning (default: 60000)")
     parser.add_argument("--n_envs", type=int, default=4, help="Number of parallel environments (default: 4)")
     args = parser.parse_args()
 

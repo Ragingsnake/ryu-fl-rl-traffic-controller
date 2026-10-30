@@ -1,0 +1,524 @@
+{
+  "nsfnet": {
+    "T1": {
+      "OSPF-SPF": {
+        "mlu_mean": 0.774551107287407,
+        "mlu_std": 0.05114185945013957,
+        "mlu_max": 0.8466392159461975,
+        "delay_mean": 9.300228534698487,
+        "loss_mean": 0.0,
+        "churn_mean": 0.0
+      },
+      "Proactive FL-DRL": {
+        "mlu_mean": 0.6072377109527588,
+        "mlu_std": 0.03868898624548226,
+        "mlu_max": 0.6616658568382263,
+        "delay_mean": 8.000171800017357,
+        "loss_mean": 0.0,
+        "churn_mean": 0.0
+      },
+      "GEANT Transfer": {
+        "mlu_mean": 0.774551107287407,
+        "mlu_std": 0.05114185945013957,
+        "mlu_max": 0.8466392159461975,
+        "delay_mean": 9.300228534698487,
+        "loss_mean": 0.0,
+        "churn_mean": 0.0
+      },
+      "GEANT Finetuned": {
+        "mlu_mean": 0.7689411062002182,
+        "mlu_std": 0.05139225952331244,
+        "mlu_max": 0.8354179859161377,
+        "delay_mean": 9.932190463066101,
+        "loss_mean": 0.0,
+        "churn_mean": 0.0
+      }
+    },
+    "T2": {
+      "OSPF-SPF": {
+        "mlu_mean": 0.8151552152633667,
+        "mlu_std": 0.13117117121950245,
+        "mlu_max": 1.2233459949493408,
+        "delay_mean": 10.800223188638686,
+        "loss_mean": 3.0,
+        "churn_mean": 0.0
+      },
+      "Proactive FL-DRL": {
+        "mlu_mean": 0.6649877065420151,
+        "mlu_std": 0.1751024676965824,
+        "mlu_max": 1.2233459949493408,
+        "delay_mean": 8.500176404595376,
+        "loss_mean": 1.0,
+        "churn_mean": 0.0
+      },
+      "GEANT Transfer": {
+        "mlu_mean": 0.8151552152633667,
+        "mlu_std": 0.13117117121950245,
+        "mlu_max": 1.2233459949493408,
+        "delay_mean": 10.800223188638686,
+        "loss_mean": 3.0,
+        "churn_mean": 0.0
+      },
+      "GEANT Finetuned": {
+        "mlu_mean": 0.8102673983573914,
+        "mlu_std": 0.13277242925686508,
+        "mlu_max": 1.2233459949493408,
+        "delay_mean": 11.432184425711634,
+        "loss_mean": 3.0,
+        "churn_mean": 0.0
+      }
+    },
+    "T3": {
+      "OSPF-SPF": {
+        "mlu_mean": 0.9723823654651642,
+        "mlu_std": 0.16472431769365875,
+        "mlu_max": 1.1877886056900024,
+        "delay_mean": 20.60023759770393,
+        "loss_mean": 22.628571963310243,
+        "churn_mean": 0.0
+      },
+      "Proactive FL-DRL": {
+        "mlu_mean": 0.7619830793142319,
+        "mlu_std": 0.12645512016356397,
+        "mlu_max": 0.944339394569397,
+        "delay_mean": 8.000387582540512,
+        "loss_mean": 0.6241317325513394,
+        "churn_mean": 0.0
+      },
+      "GEANT Transfer": {
+        "mlu_mean": 0.9723823654651642,
+        "mlu_std": 0.16472431769365875,
+        "mlu_max": 1.1877886056900024,
+        "delay_mean": 20.60023759770393,
+        "loss_mean": 22.628571963310243,
+        "churn_mean": 0.0
+      },
+      "GEANT Finetuned": {
+        "mlu_mean": 0.965379329919815,
+        "mlu_std": 0.1640964264330749,
+        "mlu_max": 1.1866464614868164,
+        "delay_mean": 15.523749634146691,
+        "loss_mean": 11.32089397907257,
+        "churn_mean": 0.0
+      }
+    },
+    "T4": {
+      "OSPF-SPF": {
+        "mlu_mean": 0.8343546324968338,
+        "mlu_std": 0.2721752272491288,
+        "mlu_max": 2.0,
+        "delay_mean": 11.375226653337476,
+        "loss_mean": 2.5,
+        "churn_mean": 0.0
+      },
+      "Proactive FL-DRL": {
+        "mlu_mean": 0.6756262511014939,
+        "mlu_std": 0.3054087336745497,
+        "mlu_max": 2.0,
+        "delay_mean": 10.15017343223095,
+        "loss_mean": 2.5,
+        "churn_mean": 0.0
+      },
+      "GEANT Transfer": {
+        "mlu_mean": 0.8343546324968338,
+        "mlu_std": 0.2721752272491288,
+        "mlu_max": 2.0,
+        "delay_mean": 11.375226653337476,
+        "loss_mean": 2.5,
+        "churn_mean": 0.0
+      },
+      "GEANT Finetuned": {
+        "mlu_mean": 0.8290281987190247,
+        "mlu_std": 0.2734171467197237,
+        "mlu_max": 2.0,
+        "delay_mean": 11.682187179565434,
+        "loss_mean": 2.25,
+        "churn_mean": 0.0
+      }
+    },
+    "T5": {
+      "OSPF-SPF": {
+        "mlu_mean": 0.774551107287407,
+        "mlu_std": 0.05114185945013957,
+        "mlu_max": 0.8466392159461975,
+        "delay_mean": 9.300228534698487,
+        "loss_mean": 0.0,
+        "churn_mean": 0.0
+      },
+      "Proactive FL-DRL": {
+        "mlu_mean": 0.6072377109527588,
+        "mlu_std": 0.03868898624548226,
+        "mlu_max": 0.6616658568382263,
+        "delay_mean": 8.000171800017357,
+        "loss_mean": 0.0,
+        "churn_mean": 0.0
+      },
+      "GEANT Transfer": {
+        "mlu_mean": 0.774551107287407,
+        "mlu_std": 0.05114185945013957,
+        "mlu_max": 0.8466392159461975,
+        "delay_mean": 9.300228534698487,
+        "loss_mean": 0.0,
+        "churn_mean": 0.0
+      },
+      "GEANT Finetuned": {
+        "mlu_mean": 0.7689411062002182,
+        "mlu_std": 0.05139225952331244,
+        "mlu_max": 0.8354179859161377,
+        "delay_mean": 9.932190463066101,
+        "loss_mean": 0.0,
+        "churn_mean": 0.0
+      }
+    },
+    "T6": {
+      "OSPF-SPF": {
+        "mlu_mean": 0.8279107481241226,
+        "mlu_std": 0.5352179156599474,
+        "mlu_max": 1.571444034576416,
+        "delay_mean": 18.400208081007005,
+        "loss_mean": 15.6,
+        "churn_mean": 0.0
+      },
+      "Proactive FL-DRL": {
+        "mlu_mean": 0.6502979797124863,
+        "mlu_std": 0.42054117885013026,
+        "mlu_max": 1.2283724546432495,
+        "delay_mean": 22.55018230652809,
+        "loss_mean": 20.599288880825043,
+        "churn_mean": 0.0
+      },
+      "GEANT Transfer": {
+        "mlu_mean": 0.8279107481241226,
+        "mlu_std": 0.5352179156599474,
+        "mlu_max": 1.571444034576416,
+        "delay_mean": 19.663210094451905,
+        "loss_mean": 17.937467465298393,
+        "churn_mean": 0.0
+      },
+      "GEANT Finetuned": {
+        "mlu_mean": 0.8221344016492367,
+        "mlu_std": 0.5297899043019573,
+        "mlu_max": 1.5553860664367676,
+        "delay_mean": 18.225274461984633,
+        "loss_mean": 15.485859040558184,
+        "churn_mean": 0.0
+      }
+    }
+  },
+  "abilene": {
+    "T1": {
+      "OSPF-SPF": {
+        "mlu_mean": 0.7724949932098388,
+        "mlu_std": 0.049983815068089806,
+        "mlu_max": 0.8291449546813965,
+        "delay_mean": 12.000369927088423,
+        "loss_mean": 0.0,
+        "churn_mean": 0.0
+      },
+      "Proactive FL-DRL": {
+        "mlu_mean": 0.7681880426406861,
+        "mlu_std": 0.04974914073731979,
+        "mlu_max": 0.8254590034484863,
+        "delay_mean": 12.400324166774748,
+        "loss_mean": 0.0,
+        "churn_mean": 0.0
+      },
+      "GEANT Transfer": {
+        "mlu_mean": 0.7724949932098388,
+        "mlu_std": 0.049983815068089806,
+        "mlu_max": 0.8291449546813965,
+        "delay_mean": 12.44835608657201,
+        "loss_mean": 0.0,
+        "churn_mean": 0.0
+      },
+      "GEANT Finetuned": {
+        "mlu_mean": 0.7689143002033234,
+        "mlu_std": 0.0496651311641515,
+        "mlu_max": 0.8291449546813965,
+        "delay_mean": 13.241636594454452,
+        "loss_mean": 0.0,
+        "churn_mean": 0.0
+      }
+    },
+    "T2": {
+      "OSPF-SPF": {
+        "mlu_mean": 0.8369111609458924,
+        "mlu_std": 0.19681281713556087,
+        "mlu_max": 1.476732850074768,
+        "delay_mean": 14.00036193084717,
+        "loss_mean": 4.0,
+        "churn_mean": 0.0
+      },
+      "Proactive FL-DRL": {
+        "mlu_mean": 0.8410442399978638,
+        "mlu_std": 0.2215937052019947,
+        "mlu_max": 1.5702742338180542,
+        "delay_mean": 14.733647295792895,
+        "loss_mean": 4.666666666666666,
+        "churn_mean": 0.0
+      },
+      "GEANT Transfer": {
+        "mlu_mean": 0.8449510729312897,
+        "mlu_std": 0.22039391290704244,
+        "mlu_max": 1.5702742338180542,
+        "delay_mean": 14.78167921559016,
+        "loss_mean": 4.666666666666666,
+        "churn_mean": 0.0
+      },
+      "GEANT Finetuned": {
+        "mlu_mean": 0.8429769325256348,
+        "mlu_std": 0.22484989954170584,
+        "mlu_max": 1.5702742338180542,
+        "delay_mean": 15.574960563023888,
+        "loss_mean": 4.666666666666666,
+        "churn_mean": 0.0
+      }
+    },
+    "T3": {
+      "OSPF-SPF": {
+        "mlu_mean": 0.9697143846750259,
+        "mlu_std": 0.16337028551334787,
+        "mlu_max": 1.1881682872772217,
+        "delay_mean": 34.73392660617829,
+        "loss_mean": 30.009271671941242,
+        "churn_mean": 0.0
+      },
+      "Proactive FL-DRL": {
+        "mlu_mean": 0.9642311382293701,
+        "mlu_std": 0.16200160615421041,
+        "mlu_max": 1.1881682872772217,
+        "delay_mean": 28.367236632506057,
+        "loss_mean": 25.034149119002954,
+        "churn_mean": 0.0
+      },
+      "GEANT Transfer": {
+        "mlu_mean": 0.9697143846750259,
+        "mlu_std": 0.16337028551334787,
+        "mlu_max": 1.1881682872772217,
+        "delay_mean": 31.16324208799998,
+        "loss_mean": 27.539790346121336,
+        "churn_mean": 0.0
+      },
+      "GEANT Finetuned": {
+        "mlu_mean": 0.9649349671602249,
+        "mlu_std": 0.1632305023144478,
+        "mlu_max": 1.1783430576324463,
+        "delay_mean": 22.81122146844863,
+        "loss_mean": 16.38479439134618,
+        "churn_mean": 0.0
+      }
+    },
+    "T4": {
+      "OSPF-SPF": {
+        "mlu_mean": 0.8321718645095825,
+        "mlu_std": 0.27242614731939874,
+        "mlu_max": 2.0,
+        "delay_mean": 14.000360759735111,
+        "loss_mean": 3.666666666666666,
+        "churn_mean": 0.0
+      },
+      "Proactive FL-DRL": {
+        "mlu_mean": 0.828120020031929,
+        "mlu_std": 0.2733011490028244,
+        "mlu_max": 2.0,
+        "delay_mean": 14.400315472284952,
+        "loss_mean": 3.666666666666666,
+        "churn_mean": 0.0
+      },
+      "GEANT Transfer": {
+        "mlu_mean": 0.8321718645095825,
+        "mlu_std": 0.27242614731939874,
+        "mlu_max": 2.0,
+        "delay_mean": 14.448347392082212,
+        "loss_mean": 3.666666666666666,
+        "churn_mean": 0.0
+      },
+      "GEANT Finetuned": {
+        "mlu_mean": 0.8285941392183304,
+        "mlu_std": 0.2731510987873201,
+        "mlu_max": 2.0,
+        "delay_mean": 15.241628538608554,
+        "loss_mean": 3.666666666666666,
+        "churn_mean": 0.0
+      }
+    },
+    "T5": {
+      "OSPF-SPF": {
+        "mlu_mean": 0.7724949932098388,
+        "mlu_std": 0.049983815068089806,
+        "mlu_max": 0.8291449546813965,
+        "delay_mean": 12.000369927088423,
+        "loss_mean": 0.0,
+        "churn_mean": 0.0
+      },
+      "Proactive FL-DRL": {
+        "mlu_mean": 0.7681880426406861,
+        "mlu_std": 0.04974914073731979,
+        "mlu_max": 0.8254590034484863,
+        "delay_mean": 12.400324166774748,
+        "loss_mean": 0.0,
+        "churn_mean": 0.0
+      },
+      "GEANT Transfer": {
+        "mlu_mean": 0.7724949932098388,
+        "mlu_std": 0.049983815068089806,
+        "mlu_max": 0.8291449546813965,
+        "delay_mean": 12.44835608657201,
+        "loss_mean": 0.0,
+        "churn_mean": 0.0
+      },
+      "GEANT Finetuned": {
+        "mlu_mean": 0.7689143002033234,
+        "mlu_std": 0.0496651311641515,
+        "mlu_max": 0.8291449546813965,
+        "delay_mean": 13.241636594454452,
+        "loss_mean": 0.0,
+        "churn_mean": 0.0
+      }
+    },
+    "T6": {
+      "OSPF-SPF": {
+        "mlu_mean": 0.8259068801999092,
+        "mlu_std": 0.5329542330054226,
+        "mlu_max": 1.5598437786102295,
+        "delay_mean": 43.96679214700063,
+        "loss_mean": 33.17255149682364,
+        "churn_mean": 0.0
+      },
+      "Proactive FL-DRL": {
+        "mlu_mean": 0.8217743986845016,
+        "mlu_std": 0.530862304094508,
+        "mlu_max": 1.5598437786102295,
+        "delay_mean": 42.60013317886988,
+        "loss_mean": 33.18735719521841,
+        "churn_mean": 0.0
+      },
+      "GEANT Transfer": {
+        "mlu_mean": 0.8259068801999092,
+        "mlu_std": 0.5329542330054226,
+        "mlu_max": 1.5598437786102295,
+        "delay_mean": 44.07345535786946,
+        "loss_mean": 33.17255149682364,
+        "churn_mean": 0.0
+      },
+      "GEANT Finetuned": {
+        "mlu_mean": 0.8252221159636974,
+        "mlu_std": 0.5330152529934415,
+        "mlu_max": 1.5598437786102295,
+        "delay_mean": 44.28677635002136,
+        "loss_mean": 33.17255149682364,
+        "churn_mean": 0.0
+      }
+    }
+  },
+  "geant": {
+    "T1": {
+      "OSPF-SPF": {
+        "mlu_mean": 0.7744277465343475,
+        "mlu_std": 0.0515449004483963,
+        "mlu_max": 0.8376381397247314,
+        "delay_mean": 10.400245839277904,
+        "loss_mean": 0.0,
+        "churn_mean": 0.0
+      },
+      "Proactive FL-DRL": {
+        "mlu_mean": 0.6373254913091659,
+        "mlu_std": 0.041814613537103154,
+        "mlu_max": 0.6878023743629456,
+        "delay_mean": 10.700148548841478,
+        "loss_mean": 0.0,
+        "churn_mean": 0.0
+      }
+    },
+    "T2": {
+      "OSPF-SPF": {
+        "mlu_mean": 0.8269719499349594,
+        "mlu_std": 0.16435153716530979,
+        "mlu_max": 1.331501841545105,
+        "delay_mean": 12.90023218345642,
+        "loss_mean": 4.333333333333334,
+        "churn_mean": 0.0
+      },
+      "Proactive FL-DRL": {
+        "mlu_mean": 0.6789836108684539,
+        "mlu_std": 0.1301431156063675,
+        "mlu_max": 1.1067568063735962,
+        "delay_mean": 11.15016442402204,
+        "loss_mean": 0.9419366466106066,
+        "churn_mean": 0.0
+      }
+    },
+    "T3": {
+      "OSPF-SPF": {
+        "mlu_mean": 0.9723307973146439,
+        "mlu_std": 0.16549929923702036,
+        "mlu_max": 1.1978273391723633,
+        "delay_mean": 22.1503834792773,
+        "loss_mean": 21.81831107536952,
+        "churn_mean": 0.0
+      },
+      "Proactive FL-DRL": {
+        "mlu_mean": 0.7390069782733917,
+        "mlu_std": 0.09353319748560435,
+        "mlu_max": 0.866394579410553,
+        "delay_mean": 10.762261060873666,
+        "loss_mean": 0.0,
+        "churn_mean": 0.0
+      }
+    },
+    "T4": {
+      "OSPF-SPF": {
+        "mlu_mean": 0.8290672117471695,
+        "mlu_std": 0.24961309747066104,
+        "mlu_max": 1.932813048362732,
+        "delay_mean": 12.316902308146162,
+        "loss_mean": 3.0,
+        "churn_mean": 0.0
+      },
+      "Proactive FL-DRL": {
+        "mlu_mean": 0.6849761968851089,
+        "mlu_std": 0.22007172472472164,
+        "mlu_max": 1.689180612564087,
+        "delay_mean": 12.070811705271405,
+        "loss_mean": 2.233333333333333,
+        "churn_mean": 0.0
+      }
+    },
+    "T5": {
+      "OSPF-SPF": {
+        "mlu_mean": 0.7744277465343475,
+        "mlu_std": 0.0515449004483963,
+        "mlu_max": 0.8376381397247314,
+        "delay_mean": 10.400245839277904,
+        "loss_mean": 0.0,
+        "churn_mean": 0.0
+      },
+      "Proactive FL-DRL": {
+        "mlu_mean": 0.6373254913091659,
+        "mlu_std": 0.041814613537103154,
+        "mlu_max": 0.6878023743629456,
+        "delay_mean": 10.700148548841478,
+        "loss_mean": 0.0,
+        "churn_mean": 0.0
+      }
+    },
+    "T6": {
+      "OSPF-SPF": {
+        "mlu_mean": 0.8277164681255818,
+        "mlu_std": 0.535403291446104,
+        "mlu_max": 1.5711658000946045,
+        "delay_mean": 28.516813386758177,
+        "loss_mean": 25.75165245135625,
+        "churn_mean": 0.0
+      },
+      "Proactive FL-DRL": {
+        "mlu_mean": 0.6310196074843407,
+        "mlu_std": 0.38441587618415884,
+        "mlu_max": 1.1470264196395874,
+        "delay_mean": 19.890230203469592,
+        "loss_mean": 14.560239767485355,
+        "churn_mean": 0.0
+      }
+    }
+  }
+}

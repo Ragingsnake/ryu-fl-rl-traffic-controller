@@ -192,7 +192,7 @@ def make_transfer_policy(agent, src_edges: int, src_managed: int, with_ospf_fall
 
             curr_p = current_action[0][k]
 
-            thresh = 0.65 if len(env.topology.nodes) == 14 else 0.75
+            thresh = 0.65 if len(env.topology.nodes) == 14 else 0.70
             return_thresh = thresh - 0.05
 
             if curr_p == 0:
@@ -204,8 +204,9 @@ def make_transfer_policy(agent, src_edges: int, src_managed: int, with_ospf_fall
                     cand_utils = [obs[env.edge_to_idx[e]] for e in cand_edges if e in env.edge_to_idx]
                     cand_caps = [env.topology[e[0]][e[1]]["capacity"] for e in cand_edges]
                     proj_cand = max([u_val + (demand / c) for u_val, c in zip(cand_utils, cand_caps)]) if cand_utils else 1.0
+                    max_cand = max(cand_utils) if cand_utils else 1.0
 
-                    if not cand_has_fail and (proj_cand < max_p0 - 0.02 or p0_has_fail):
+                    if not cand_has_fail and (p0_has_fail or (proj_cand < 0.95 and max_cand <= max_p0 + 0.05)):
                         current_action[0][k] = chosen_p
                         hold_count[0][k] = 0
             else:
@@ -616,6 +617,8 @@ def run_demo_for_topology(topology: str, args, base_results_dir: Path):
         axes[-1].set_xlabel("Time of Day (08:00 AM - 04:20 PM / 5-minute intervals)", fontsize=11)
         plt.tight_layout()
         plt.savefig(results_dir / fname, dpi=200)
+        plt.savefig(results_dir / fname.replace(".png", ".pdf"), bbox_inches="tight")
+        plt.savefig(results_dir / fname.replace(".png", ".svg"), bbox_inches="tight")
         plt.close()
 
     # 2. Comprehensive 4-Subplot Deep Dive into Scenario T4 (Flash Crowd)
@@ -662,6 +665,8 @@ def run_demo_for_topology(topology: str, args, base_results_dir: Path):
     )
     plt.tight_layout()
     plt.savefig(results_dir / "scenario_t4_flash_crowd.png", dpi=200)
+    plt.savefig(results_dir / "scenario_t4_flash_crowd.pdf", bbox_inches="tight")
+    plt.savefig(results_dir / "scenario_t4_flash_crowd.svg", bbox_inches="tight")
     plt.close()
 
     # 3. Comprehensive 4-Subplot Deep Dive into Scenario T2 (Traffic Spike)
@@ -708,6 +713,8 @@ def run_demo_for_topology(topology: str, args, base_results_dir: Path):
     )
     plt.tight_layout()
     plt.savefig(results_dir / "scenario_t2_traffic_spike.png", dpi=200)
+    plt.savefig(results_dir / "scenario_t2_traffic_spike.pdf", bbox_inches="tight")
+    plt.savefig(results_dir / "scenario_t2_traffic_spike.svg", bbox_inches="tight")
     plt.close()
 
     # 4. Comprehensive 4-Subplot Deep Dive into Scenario T5 (Link Failure)
@@ -753,6 +760,8 @@ def run_demo_for_topology(topology: str, args, base_results_dir: Path):
     )
     plt.tight_layout()
     plt.savefig(results_dir / "scenario_t5_link_failure.png", dpi=200)
+    plt.savefig(results_dir / "scenario_t5_link_failure.pdf", bbox_inches="tight")
+    plt.savefig(results_dir / "scenario_t5_link_failure.svg", bbox_inches="tight")
     plt.close()
 
     # 4b. Comprehensive 4-Subplot Deep Dive into Scenario T6 (Irregular Day)
@@ -808,6 +817,8 @@ def run_demo_for_topology(topology: str, args, base_results_dir: Path):
     )
     plt.tight_layout()
     plt.savefig(results_dir / "scenario_t6_irregular_day.png", dpi=200)
+    plt.savefig(results_dir / "scenario_t6_irregular_day.pdf", bbox_inches="tight")
+    plt.savefig(results_dir / "scenario_t6_irregular_day.svg", bbox_inches="tight")
     plt.close()
 
     # 5. Summary Grouped Bar Chart Across Scenarios (with Error Bars)
@@ -852,6 +863,8 @@ def run_demo_for_topology(topology: str, args, base_results_dir: Path):
     )
     plt.tight_layout()
     plt.savefig(results_dir / "summary_metrics_barchart.png", dpi=200)
+    plt.savefig(results_dir / "summary_metrics_barchart.pdf", bbox_inches="tight")
+    plt.savefig(results_dir / "summary_metrics_barchart.svg", bbox_inches="tight")
     plt.close()
 
     print(f"[{topology.upper()}] All multi-metric comparative plots successfully generated in {results_dir}!")
