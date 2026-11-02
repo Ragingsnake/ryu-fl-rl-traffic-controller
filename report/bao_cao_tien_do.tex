@@ -110,15 +110,15 @@ Global Communication Rounds & $R$ & 50 rounds & Đạt trạng thái hội tụ 
 Đã hoàn thiện môi trường Gymnasium (\texttt{rl/env.py}) để phục vụ huấn luyện tác tử điều khiển lưu lượng theo cơ chế tối ưu hóa vòng lặp kín (Closed-Loop Autonomous Routing). Thiết lập kỹ thuật của môi trường và tác tử bao gồm các điểm then chốt:
 
 \begin{itemize}[leftmargin=1.5em, itemsep=0.3ex]
-    \item \textbf{Không gian trạng thái (Observation Space) và Cơ chế nạp dự báo (State Space Injection):} Không gian quan sát của tác tử được cấu thành thông qua phép ghép nối đặc trưng (Feature Concatenation) giữa ba thành phần thông tin trọng yếu:
+    \item \textbf{Không gian trạng thái và cơ chế nạp dự báo:} Không gian quan sát của tác tử được cấu thành thông qua phép ghép nối đặc trưng (Feature Concatenation) giữa ba thành phần thông tin trọng yếu:
     \begin{equation}
         \mathbf{s}_t = \left[ \mathbf{u}_t \;\parallel\; \mathbf{\hat{u}}_{t+1} \;\parallel\; \mathbf{d}_t \right]
     \end{equation}
-    trong đó $\mathbf{u}_t$ là mức tải thực tế hiện tại của các liên kết, $\mathbf{d}_t$ là nhu cầu lưu lượng tức thời của các luồng lớn, và đặc biệt $\mathbf{\hat{u}}_{t+1}$ là \textbf{vector tải dự phóng ở bước kế tiếp do mô hình Federated TrafficLSTM cung cấp}. Cơ chế nạp dự báo này trang bị cho tác tử năng lực phán đoán chủ động, cho phép điều chuyển luồng giải tỏa nguy cơ tắc nghẽn từ trước khi hàng đợi gói tin bị phình to.
+    trong đó $\mathbf{u}_t$ là mức tải thực tế hiện tại của các liên kết, $\mathbf{d}_t$ là nhu cầu lưu lượng tức thời của các luồng lớn, và đặc biệt $\mathbf{\hat{u}}_{t+1}$ là vector tải dự phóng ở bước kế tiếp do mô hình Federated TrafficLSTM cung cấp. Cơ chế nạp dự báo này trang bị cho tác tử năng lực phán đoán chủ động, cho phép điều chuyển luồng giải tỏa nguy cơ tắc nghẽn từ trước khi hàng đợi gói tin bị phình to.
     
-    \item \textbf{Không gian hành động đa rời rạc (Multi-Discrete Action Space) theo nguyên lý Pareto 80/20:} Thay vì điều khiển toàn bộ ma trận lưu lượng (gây bùng nổ tổ hợp không gian hành động), hệ thống áp dụng nguyên lý 80/20 chỉ tập trung kiểm soát nhóm luồng lưu lượng trọng yếu (Elephant Flows / Heavy-Hitters chiếm trên 85\% tổng tải): 20 luồng trên NSFNET, 30 luồng trên GÉANT và 15 luồng trên Abilene. Với mỗi luồng này, thuật toán Yen tiền tính toán $K = 3$ đường đi ngắn nhất không lặp vòng (\texttt{K-Shortest Paths}). Tác tử lựa chọn hành động trong không gian \texttt{MultiDiscrete([3, ..., 3])}, trong khi các luồng nhỏ còn lại mặc định phân bổ trên tuyến ngắn nhất OSPF.
+    \item \textbf{Không gian hành động đa rời rạc (Multi-Discrete Action Space):} Thay vì điều khiển toàn bộ ma trận lưu lượng (gây bùng nổ tổ hợp không gian hành động), hệ thống áp dụng nguyên lý 80/20 chỉ tập trung kiểm soát nhóm luồng lưu lượng trọng yếu (Elephant Flows / Heavy-Hitters chiếm trên 85\% tổng tải): 20 luồng trên NSFNET, 30 luồng trên GÉANT và 15 luồng trên Abilene. Với mỗi luồng này, thuật toán Yen tiền tính toán $K = 3$ đường đi ngắn nhất không lặp vòng (\texttt{K-Shortest Paths}). Tác tử lựa chọn hành động trong không gian \texttt{MultiDiscrete([3, ..., 3])}, trong khi các luồng nhỏ còn lại mặc định phân bổ trên tuyến ngắn nhất OSPF.
 
-    \item \textbf{Kiến trúc mạng chính sách RecurrentPPO (MlpLstmPolicy):} Tác tử sử dụng kiến trúc Actor-Critic kết hợp tầng nhớ LSTM kích thước 128 đơn vị. Khác với thuật toán PPO phản xạ không trạng thái (dễ đưa ra quyết định đổi tuyến liên tục khi tải dao động nhẹ quanh ngưỡng), tầng nhớ LSTM lưu giữ vết ngữ cảnh định tuyến và thiết lập nên \textbf{quán tính hành động (Action Inertia)}, giúp triệt tiêu hoàn toàn hiện tượng rung giật tuyến (Route Flapping), giữ tỷ lệ nhảy tuyến (Route Churn) ở mức ổn định dưới 0.1\% mà vẫn bảo đảm phản xạ tức thời khi có sự cố đứt liên kết.
+    \item \textbf{Kiến trúc mạng RecurrentPPO (MlpLstmPolicy):} Tác tử sử dụng kiến trúc Actor-Critic kết hợp tầng nhớ LSTM kích thước 128 đơn vị. Khác với thuật toán PPO phản xạ không trạng thái (dễ đưa ra quyết định đổi tuyến liên tục khi tải dao động nhẹ quanh ngưỡng), tầng nhớ LSTM lưu giữ vết ngữ cảnh định tuyến và thiết lập nên quán tính hành động (Action Inertia), giúp triệt tiêu hoàn toàn hiện tượng rung giật tuyến (Route Flapping), giữ tỷ lệ nhảy tuyến (Route Churn) ở mức ổn định dưới 0.1\% mà vẫn bảo đảm phản xạ tức thời khi có sự cố đứt liên kết.
 \end{itemize}
 
 \begin{figure}[H]
@@ -130,13 +130,13 @@ Global Communication Rounds & $R$ & 50 rounds & Đạt trạng thái hội tụ 
 
 \begin{table}[H]
 \centering
-\caption{\textit{Bảng siêu tham số cấu hình tác tử điều khiển định tuyến \texttt{RecurrentPPO} và hàm phần thưởng.}}
+\caption{\textit{Bảng cấu hình siêu tham số mô hình định tuyến \texttt{RecurrentPPO}.}}
 \label{tab:rl_hyperparameters}
 \small
 \renewcommand{\arraystretch}{1.18}
 \begin{tabularx}{\textwidth}{@{} p{4.6cm} c c X @{}}
 \toprule
-\textbf{Tham số (Parameter)} & \textbf{Ký hiệu} & \textbf{Giá trị} & \textbf{Mô tả kỹ thuật \& Ý nghĩa} \\
+\textbf{Tham số (Parameter)} & \textbf{Ký hiệu} & \textbf{Giá trị} & \textbf{Mô tả kỹ thuật} \\
 \midrule
 \multicolumn{4}{@{}l}{\textbf{1. Policy Network Architecture (MlpLstmPolicy)}} \\
 Policy Class & -- & \texttt{MlpLstm} & Actor-Critic tích hợp tầng nhớ trạng thái ẩn LSTM. \\
@@ -155,16 +155,6 @@ PPO Clip Range & $\epsilon_{\text{clip}}$ & 0.2 & Giới hạn biên độ thay 
 Value Loss Coefficient & $c_1$ & 0.5 & Trọng số tổn thất hàm giá trị trong tổng hàm mất mát. \\
 Entropy Coefficient & $c_2$ & 0.001 & Kiểm soát thăm dò, ưu tiên khai thác chính sách tối ưu. \\
 Max Gradient Norm & $g_{\text{max}}$ & 0.5 & Giới hạn chuẩn gradient chống bùng nổ gradient trong LSTM. \\
-\midrule
-\multicolumn{4}{@{}l}{\textbf{3. Action Space \& Reward Formulation}} \\
-Managed Elephant Flows & $|\mathcal{M}|$ & 20 / 30 / 15 & Quy tắc Pareto 80/20 trên NSFNET / GÉANT / Abilene. \\
-Yen Candidate Paths & $K$ & 3 paths & Tập đường đi ngắn nhất không lặp vòng ($p_0, p_1, p_2$). \\
-Peak MLU Penalty Weight & $w_{\text{MLU}}$ & 1.0 & Phạt tuyến tính ép tải cực đại dưới ngưỡng nghẽn. \\
-Delay Penalty Weight & $w_{\text{delay}}$ & 0.5 & Tối thiểu hóa độ trễ lan truyền và độ trễ xếp hàng. \\
-Loss Penalty Weight & $w_{\text{loss}}$ & 40.0 & Ưu tiên hàng đầu: bảo vệ gói tin khi tiệm cận tắc nghẽn. \\
-Churn Penalty Weight & $w_{\text{churn}}$ & 0.08 & Triệt tiêu hoàn toàn hiện tượng rung giật đường truyền. \\
-Adaptive Delay Weight & $w_{\text{excess}}$ & 0.8 / 0.3 & Chặt chẽ khi tải an toàn, nới lỏng khi tiệm cận ngưỡng nghẽn. \\
-Hold-down Timer & $T_{\text{hold}}$ & $\ge 15$ steps & Khóa tuyến tối thiểu chống dao động tuyến ping-pong. \\
 \bottomrule
 \end{tabularx}
 \end{table}
