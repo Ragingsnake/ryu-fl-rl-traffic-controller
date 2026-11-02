@@ -69,43 +69,37 @@ Môi trường huấn luyện Gymnasium (\texttt{rl/env.py}) đã được xây 
 Dữ liệu được tiền xử lý và cắt lát theo cửa sổ trượt gồm 12 bước quá khứ ($T=12$, tương đương 3 giờ) để dự đoán 3 bước trong tương lai ($H=3$, tương đương 45 phút nhìn trước) và phân chia theo 3 miền mạng phục vụ huấn luyện FL. Đồng thời, chuỗi ma trận lưu lượng thực nghiệm của GÉANT và Abilene đã được chuẩn hóa để kiểm thử khả năng thích ứng và chuyển giao mô hình.
 
 \subsection{Xây dựng và thiết lập mô hình Federated Learning (TrafficLSTM)}
-Đã triển khai kiến trúc học liên kết (Federated Learning) nhằm dự báo chủ động mức độ chiếm dụng của các liên kết mạng diện rộng (WAN) mà không xâm phạm quyền riêng tư dữ liệu lưu lượng giữa các miền tự trị (Autonomous Systems). Mỗi miền mạng hoạt động như một FL Client độc lập, huấn luyện mô hình dự báo cục bộ trên tập chuỗi thời gian của riêng mình, sau đó chỉ truyền tải sai phân trọng số mô hình về máy chủ trung tâm để tổng hợp thành mô hình toàn cục.
+Đã triển khai kiến trúc học liên kết (Federated Learning) nhằm dự báo chủ động mức độ chiếm dụng của các liên kết mạng diện rộng mà không xâm phạm quyền riêng tư dữ liệu lưu lượng giữa các miền tự trị (Autonomous Systems). Mỗi miền mạng hoạt động như một FL Client độc lập, huấn luyện mô hình dự báo cục bộ trên tập chuỗi thời gian của riêng mình, sau đó chỉ truyền tải sai phân trọng số mô hình về máy chủ trung tâm để tổng hợp thành mô hình toàn cục.
 
-Về cấu trúc mạng và thiết lập mô hình \texttt{TrafficLSTM}:
-\begin{itemize}[leftmargin=1.5em, itemsep=0.3ex]
-    \item \textbf{Cửa sổ thời gian (Lookback \& Horizon):} Mô hình tiếp nhận chuỗi tải liên kết trong cửa sổ trượt quá khứ gồm 12 bước thời gian ($T = 12$, tương đương 3 giờ lịch sử với chu kỳ lấy mẫu 15 phút), và xuất ra dự báo mức tải tương lai cho 3 bước thời gian kế tiếp ($H = 3$, tương đương 45 phút nhìn trước).
-    \item \textbf{Kiến trúc tầng ẩn và kỹ thuật điều hòa:} Sử dụng 2 tầng hồi quy LSTM với kích thước tầng ẩn 64 đơn vị (\texttt{hidden\_size} = 64), tích hợp lớp \texttt{Dropout} với tỷ lệ $p = 0.2$ giữa các tầng nhằm triệt tiêu hiện tượng quá khớp (overfitting) và tăng cường độ vững cáp (robustness) trước các xung đột biến tải. Trạng thái ẩn tại bước thời gian cuối cùng được đưa qua một tầng tuyến tính (Linear Projection Head) để suy luận tải dự phóng tương lai.
-    \item \textbf{Đệm đặc trưng động (Dynamic Feature Padding):} Áp dụng kỹ thuật chèn số 0 để chuẩn hóa kích thước đầu vào của các miền mạng có số lượng liên kết khác nhau về cùng một chuẩn thống nhất mà không làm biến dạng phân phối dữ liệu gốc.
-    \item \textbf{Tổng hợp thích nghi FedAdam trên FL Server:} Nhằm khắc phục hiện tượng trôi dạt trọng số (client drift) do dữ liệu lưu lượng giữa các miền mang bản chất dị thể phi đồng nhất (Non-IID), máy chủ trung tâm áp dụng thuật toán tối ưu hóa \texttt{FedAdam} với các hệ số động lượng thích nghi $\beta_1 = 0.9$ và $\beta_2 = 0.99$, giúp mô hình hội tụ ổn định và đạt sai số dự báo trung bình $\text{MAE} < 0.05$.
-\end{itemize}
+Toàn bộ cấu trúc mạng nơ-ron hồi quy \texttt{TrafficLSTM}, kỹ thuật điều hòa và thiết lập siêu tham số của thuật toán tổng hợp \texttt{FedAdam} được chuẩn hóa chi tiết tại Bảng \ref{tab:fl_hyperparameters}.
 
-\begin{table}[htbp]
+\begin{table}[H]
 \centering
 \caption{\textit{Bảng siêu tham số cấu hình mô hình Federated TrafficLSTM và thuật toán tổng hợp FedAdam.}}
 \label{tab:fl_hyperparameters}
 \small
 \renewcommand{\arraystretch}{1.18}
-\begin{tabularx}{\textwidth}{@{} p{4.2cm} c c X @{}}
+\begin{tabularx}{\textwidth}{@{} p{4.6cm} c c X @{}}
 \toprule
-\textbf{Tham số cấu hình} & \textbf{Ký hiệu} & \textbf{Giá trị} & \textbf{Mô tả kỹ thuật \& Ý nghĩa} \\
+\textbf{Tham số (Parameter)} & \textbf{Ký hiệu} & \textbf{Giá trị} & \textbf{Mô tả kỹ thuật \& Ý nghĩa} \\
 \midrule
-\multicolumn{4}{@{}l}{\textbf{1. Cửa sổ thời gian \& Kiến trúc mạng (TrafficLSTM)}} \\
-Cửa sổ lịch sử trượt & $T$ & 12 bước & Chuỗi quan sát 3 giờ quá khứ ($12 \times 15\text{ phút}$). \\
-Tầm nhìn dự báo tương lai & $H$ & 3 bước & Khoảng nhìn trước 45 phút ($3 \times 15\text{ phút}$) cho RL. \\
-Số tầng hồi quy LSTM & $L$ & 2 tầng & Học phụ thuộc thời gian và tính tuần hoàn tải mạng. \\
-Kích thước tầng ẩn & $d_{\text{hidden}}$ & 64 units & Dung lượng biểu diễn tối ưu, triệt tiêu nguy cơ quá khớp. \\
-Tỷ lệ ngắt Dropout & $p_{\text{drop}}$ & 0.2 & Điều hòa kết nối giữa 2 tầng LSTM chống overfit. \\
-Tầng xuất dữ liệu & FC & Tuyến tính & Chiếu trạng thái ẩn: $64 \to (H \times F_{\text{in}})$. \\
-Đệm đặc trưng động & -- & Zero-Padding & Chuẩn hóa kích thước liên kết giữa các miền dị thể. \\
+\multicolumn{4}{@{}l}{\textbf{1. Architecture \& Sequence Parameters (TrafficLSTM)}} \\
+Lookback Window & $T$ & 12 steps & Chuỗi quan sát 3 giờ quá khứ ($12 \times 15\text{ phút}$). \\
+Prediction Horizon & $H$ & 3 steps & Khoảng nhìn trước 45 phút ($3 \times 15\text{ phút}$) cho RL. \\
+LSTM Layers & $L$ & 2 layers & Học phụ thuộc thời gian và tính tuần hoàn tải mạng. \\
+Hidden Dimension & $d_{\text{hidden}}$ & 64 units & Dung lượng biểu diễn tối ưu, triệt tiêu nguy cơ quá khớp. \\
+Dropout Rate & $p_{\text{drop}}$ & 0.2 & Điều hòa kết nối giữa 2 tầng LSTM chống overfit. \\
+Output Projection Head & FC & Linear & Chiếu trạng thái ẩn: $64 \to (H \times F_{\text{in}})$. \\
+Dynamic Feature Padding & -- & Zero-Padding & Chuẩn hóa kích thước liên kết giữa các miền dị thể. \\
 \midrule
-\multicolumn{4}{@{}l}{\textbf{2. Huấn luyện Client \& Tối ưu hóa FedAdam}} \\
-Kích thước mini-batch & $B_{\text{FL}}$ & 32 mẫu & Kích thước lô huấn luyện cục bộ tại mỗi miền mạng. \\
-Epoch cục bộ mỗi vòng & $E$ & 5 epochs & Cân bằng giữa tính toán biên và băng thông truyền thông. \\
-Tốc độ học cục bộ & $\eta_{\text{local}}$ & $1 \times 10^{-3}$ & Bộ tối ưu Adam, hàm mất mát sai số bình phương (MSE). \\
-Tốc độ học máy chủ & $\eta_{\text{global}}$ & $1 \times 10^{-3}$ & Cập nhật mô hình toàn cục trên máy chủ điều phối. \\
-Động lượng FedAdam & $\beta_1, \beta_2$ & 0.9, 0.99 & Bù đắp trôi dạt trọng số do dữ liệu phân tán Non-IID. \\
-Tham số ổn định số học & $\tau$ & $1 \times 10^{-3}$ & Tránh hiện tượng chia cho 0 trong bộ tiền điều kiện. \\
-Vòng giao tiếp toàn cục & $R$ & 50 vòng & Đạt trạng thái hội tụ với sai số dự báo $\text{MAE} < 0.05$. \\
+\multicolumn{4}{@{}l}{\textbf{2. Client Training \& FedAdam Optimization}} \\
+Mini-batch Size & $B_{\text{FL}}$ & 32 samples & Kích thước lô huấn luyện cục bộ tại mỗi miền mạng. \\
+Local Epochs & $E$ & 5 epochs & Cân bằng giữa tính toán biên và băng thông truyền thông. \\
+Local Learning Rate & $\eta_{\text{local}}$ & $1 \times 10^{-3}$ & Bộ tối ưu Adam, hàm mất mát sai số bình phương (MSE). \\
+Global Learning Rate & $\eta_{\text{global}}$ & $1 \times 10^{-3}$ & Cập nhật mô hình toàn cục trên máy chủ điều phối. \\
+FedAdam Momentum & $\beta_1, \beta_2$ & 0.9, 0.99 & Bù đắp trôi dạt trọng số do dữ liệu phân tán Non-IID. \\
+Numerical Stability ($\tau$) & $\tau$ & $1 \times 10^{-3}$ & Tránh hiện tượng chia cho 0 trong bộ tiền điều kiện. \\
+Global Communication Rounds & $R$ & 50 rounds & Đạt trạng thái hội tụ với sai số dự báo $\text{MAE} < 0.05$. \\
 \bottomrule
 \end{tabularx}
 \end{table}
@@ -138,37 +132,37 @@ Vòng giao tiếp toàn cục & $R$ & 50 vòng & Đạt trạng thái hội tụ
 \label{tab:rl_hyperparameters}
 \small
 \renewcommand{\arraystretch}{1.18}
-\begin{tabularx}{\textwidth}{@{} p{4.2cm} c c X @{}}
+\begin{tabularx}{\textwidth}{@{} p{4.6cm} c c X @{}}
 \toprule
-\textbf{Tham số cấu hình} & \textbf{Ký hiệu} & \textbf{Giá trị} & \textbf{Mô tả kỹ thuật \& Ý nghĩa} \\
+\textbf{Tham số (Parameter)} & \textbf{Ký hiệu} & \textbf{Giá trị} & \textbf{Mô tả kỹ thuật \& Ý nghĩa} \\
 \midrule
-\multicolumn{4}{@{}l}{\textbf{1. Kiến trúc mạng chính sách (Policy Network - MlpLstmPolicy)}} \\
-Lớp chính sách & -- & \texttt{MlpLstm} & Actor-Critic tích hợp tầng nhớ trạng thái ẩn LSTM. \\
-Tầng nhớ trạng thái ẩn & $d_{\text{lstm}}$ & 128 units & Tạo quán tính hành động (Action Inertia) chống rung giật. \\
-Mạng Actor ($\pi_\theta$) & MLP & $[256, 128]$ & Đầu ra phân phối xác suất Softmax chọn tuyến Yen $K=3$. \\
-Mạng Critic ($V_\phi$) & MLP & $[256, 128]$ & Đầu ra vô hướng ước lượng hàm giá trị trạng thái $V(\mathbf{s}_t)$. \\
+\multicolumn{4}{@{}l}{\textbf{1. Policy Network Architecture (MlpLstmPolicy)}} \\
+Policy Class & -- & \texttt{MlpLstm} & Actor-Critic tích hợp tầng nhớ trạng thái ẩn LSTM. \\
+LSTM Hidden Units & $d_{\text{lstm}}$ & 128 units & Tạo quán tính hành động (Action Inertia) chống rung giật. \\
+Actor Network ($\pi_\theta$) & MLP & $[256, 128]$ & Đầu ra phân phối xác suất Softmax chọn tuyến Yen $K=3$. \\
+Critic Network ($V_\phi$) & MLP & $[256, 128]$ & Đầu ra vô hướng ước lượng hàm giá trị trạng thái $V(\mathbf{s}_t)$. \\
 \midrule
-\multicolumn{4}{@{}l}{\textbf{2. Quá trình tối ưu hóa RecurrentPPO \& GAE}} \\
-Bộ đệm Rollout & $N_{\text{steps}}$ & 1024 bước & Thu thập 128 bước trên 8 môi trường mạng song song. \\
-Kích thước mini-batch & $B_{\text{RL}}$ & 64 mẫu & Kích thước lô chuyển trạng thái trong mỗi pha tối ưu. \\
-Epoch cập nhật & $K_{\text{epoch}}$ & 10 epochs & Số lượt huấn luyện lặp lại trên bộ đệm rollout. \\
-Lập lịch tốc độ học & $\alpha$ & $3 \cdot 10^{-4} \to 1 \cdot 10^{-4}$ & Suy giảm tuyến tính theo tiến trình học tổng thể. \\
-Hệ số chiết khấu & $\gamma$ & 0.95 & Cân bằng giữa tối ưu tức thời và rủi ro nghẽn dài hạn. \\
-Hệ số lợi thế GAE & $\lambda_{\text{GAE}}$ & 0.95 & Kiểm soát phương sai và độ lệch của hàm ước lượng lợi thế. \\
-Ngưỡng cắt tỉa PPO & $\epsilon_{\text{clip}}$ & 0.2 & Giới hạn biên độ thay đổi chính sách trong vùng tin cậy. \\
-Hệ số mất mát Critic & $c_1$ & 0.5 & Trọng số tổn thất hàm giá trị trong tổng hàm mất mát. \\
-Hệ số Entropy & $c_2$ & 0.001 & Kiểm soát thăm dò, ưu tiên khai thác chính sách tối ưu. \\
-Cắt tỉa Gradient & $g_{\text{max}}$ & 0.5 & Giới hạn chuẩn gradient chống bùng nổ gradient trong LSTM. \\
+\multicolumn{4}{@{}l}{\textbf{2. RecurrentPPO Optimization \& GAE}} \\
+Rollout Buffer & $N_{\text{steps}}$ & 1024 steps & Thu thập 128 bước trên 8 môi trường mạng song song. \\
+Mini-batch Size & $B_{\text{RL}}$ & 64 samples & Kích thước lô chuyển trạng thái trong mỗi pha tối ưu. \\
+Update Epochs & $K_{\text{epoch}}$ & 10 epochs & Số lượt huấn luyện lặp lại trên bộ đệm rollout. \\
+Learning Rate Schedule & $\alpha$ & $3 \cdot 10^{-4} \to 1 \cdot 10^{-4}$ & Suy giảm tuyến tính theo tiến trình học tổng thể. \\
+Discount Factor & $\gamma$ & 0.95 & Cân bằng giữa tối ưu tức thời và rủi ro nghẽn dài hạn. \\
+GAE Coefficient & $\lambda_{\text{GAE}}$ & 0.95 & Kiểm soát phương sai và độ lệch của hàm ước lượng lợi thế. \\
+PPO Clip Range & $\epsilon_{\text{clip}}$ & 0.2 & Giới hạn biên độ thay đổi chính sách trong vùng tin cậy. \\
+Value Loss Coefficient & $c_1$ & 0.5 & Trọng số tổn thất hàm giá trị trong tổng hàm mất mát. \\
+Entropy Coefficient & $c_2$ & 0.001 & Kiểm soát thăm dò, ưu tiên khai thác chính sách tối ưu. \\
+Max Gradient Norm & $g_{\text{max}}$ & 0.5 & Giới hạn chuẩn gradient chống bùng nổ gradient trong LSTM. \\
 \midrule
-\multicolumn{4}{@{}l}{\textbf{3. Không gian hành động \& Hàm phần thưởng môi trường}} \\
-Luồng kiểm soát trọng yếu & $|\mathcal{M}|$ & 20 / 30 / 15 & Quy tắc Pareto 80/20 trên NSFNET / GÉANT / Abilene. \\
-Số tuyến ứng viên Yen & $K$ & 3 tuyến & Tập đường đi ngắn nhất không lặp vòng ($p_0, p_1, p_2$). \\
-Trọng số phạt tải đỉnh & $w_{\text{MLU}}$ & 1.0 & Phạt tuyến tính ép tải cực đại dưới ngưỡng nghẽn. \\
-Trọng số phạt trễ gói & $w_{\text{delay}}$ & 0.5 & Tối thiểu hóa độ trễ lan truyền và độ trễ xếp hàng. \\
-Trọng số phạt mất gói & $w_{\text{loss}}$ & 40.0 & Ưu tiên hàng đầu: bảo vệ gói tin khi tiệm cận tắc nghẽn. \\
-Trọng số phạt nhảy tuyến & $w_{\text{churn}}$ & 0.08 & Triệt tiêu hoàn toàn hiện tượng rung giật đường truyền. \\
-Phạt trễ thích nghi & $w_{\text{excess}}$ & 0.8 / 0.3 & Chặt chẽ khi tải an toàn, nới lỏng khi tiệm cận ngưỡng nghẽn. \\
-Bộ đệm giữ tuyến an toàn & $T_{\text{hold}}$ & $\ge 15$ bước & Khóa tuyến tối thiểu chống dao động tuyến ping-pong. \\
+\multicolumn{4}{@{}l}{\textbf{3. Action Space \& Reward Formulation}} \\
+Managed Elephant Flows & $|\mathcal{M}|$ & 20 / 30 / 15 & Quy tắc Pareto 80/20 trên NSFNET / GÉANT / Abilene. \\
+Yen Candidate Paths & $K$ & 3 paths & Tập đường đi ngắn nhất không lặp vòng ($p_0, p_1, p_2$). \\
+Peak MLU Penalty Weight & $w_{\text{MLU}}$ & 1.0 & Phạt tuyến tính ép tải cực đại dưới ngưỡng nghẽn. \\
+Delay Penalty Weight & $w_{\text{delay}}$ & 0.5 & Tối thiểu hóa độ trễ lan truyền và độ trễ xếp hàng. \\
+Loss Penalty Weight & $w_{\text{loss}}$ & 40.0 & Ưu tiên hàng đầu: bảo vệ gói tin khi tiệm cận tắc nghẽn. \\
+Churn Penalty Weight & $w_{\text{churn}}$ & 0.08 & Triệt tiêu hoàn toàn hiện tượng rung giật đường truyền. \\
+Adaptive Delay Weight & $w_{\text{excess}}$ & 0.8 / 0.3 & Chặt chẽ khi tải an toàn, nới lỏng khi tiệm cận ngưỡng nghẽn. \\
+Hold-down Timer & $T_{\text{hold}}$ & $\ge 15$ steps & Khóa tuyến tối thiểu chống dao động tuyến ping-pong. \\
 \bottomrule
 \end{tabularx}
 \end{table}
