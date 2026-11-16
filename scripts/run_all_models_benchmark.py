@@ -350,7 +350,7 @@ def plot_trajectories(topo_name: str, scenarios: list[str], trajectories: dict, 
         "T3": "T3: Progressive Surge (+50% Load)",
         "T4": "T4: Extreme Flash Crowd (2x Load)",
         "T5": "T5: Critical Link Failure",
-        "T6": "T6: Asymmetric Diurnal Drift",
+        "T6": "T6: Irregular Day",
     }
     label_map = {
         "OSPF": "OSPF Shortest Path",
