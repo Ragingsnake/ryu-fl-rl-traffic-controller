@@ -316,9 +316,9 @@ def plot_trajectories(topo_name: str, scenarios: list[str], trajectories: dict, 
     timesteps = np.arange(100)
 
     for metric, ylabel, fname in [
-        ("mlu", "MLU", f"{topo_name}_trajectory_mlu.png"),
-        ("delay", "Delay (ms)", f"{topo_name}_trajectory_delay.png"),
-        ("loss", "Packet Loss (%)", f"{topo_name}_trajectory_loss.png"),
+        ("mlu", "Maximum Link Utilization (MLU)", f"{topo_name}_trajectory_mlu.png"),
+        ("delay", "Average End-to-End Delay (ms)", f"{topo_name}_trajectory_delay.png"),
+        ("loss", "Packet Loss Ratio (%)", f"{topo_name}_trajectory_loss.png"),
     ]:
         fig, axes = plt.subplots(6, 1, figsize=(11, 15), sharex=True)
         for idx, sc in enumerate(scenarios):
@@ -345,25 +345,25 @@ def plot_trajectories(topo_name: str, scenarios: list[str], trajectories: dict, 
     os.makedirs(report_fig_dir, exist_ok=True)
 
     sc_titles = {
-        "T1": "T1: Chu kỳ tải tự nhiên (Nominal)",
-        "T2": "T2: Đột biến tải cục bộ (Spike)",
-        "T3": "T3: Tăng tải lũy tiến (+50%)",
-        "T4": "T4: Dồn tải tức thời (Flash Crowd)",
-        "T5": "T5: Đứt liên kết lõi (Link Failure)",
-        "T6": "T6: Phân bố lệch pha (Irregular Day)",
+        "T1": "T1: Nominal Traffic Cycle",
+        "T2": "T2: Local Traffic Burst (Spike)",
+        "T3": "T3: Progressive Surge (+50% Load)",
+        "T4": "T4: Extreme Flash Crowd (2x Load)",
+        "T5": "T5: Critical Link Failure",
+        "T6": "T6: Asymmetric Diurnal Drift",
     }
     label_map = {
-        "OSPF": "OSPF-SPF",
-        "In-Domain (Baseline)": "In-Domain Baseline",
-        "In-Domain (3.0 RL)": "In-Domain (3.0 RL)",
-        "GEANT 3.0 Transfer": "GEANT Transfer",
-        "GEANT 3.0 Finetuned": "GEANT Finetuned",
+        "OSPF": "OSPF Shortest Path",
+        "In-Domain (Baseline)": "In-Domain DRL",
+        "In-Domain (3.0 RL)": "In-Domain DRL",
+        "GEANT 3.0 Transfer": "GÉANT Zero-Shot Transfer",
+        "GEANT 3.0 Finetuned": "GÉANT Fine-Tuned",
     }
 
     for metric, ylabel, base_name in [
-        ("mlu", "MLU", f"overview_{topo_name}_mlu"),
-        ("delay", "Độ trễ trung bình (ms)", f"overview_{topo_name}_delay"),
-        ("loss", "Tỷ lệ mất gói (%)", f"overview_{topo_name}_loss"),
+        ("mlu", "Maximum Link Utilization (MLU)", f"overview_{topo_name}_mlu"),
+        ("delay", "Average End-to-End Delay (ms)", f"overview_{topo_name}_delay"),
+        ("loss", "Packet Loss Ratio (%)", f"overview_{topo_name}_loss"),
     ]:
         fig_2x3, axes_2x3 = plt.subplots(2, 3, figsize=(15, 6.5), sharex=True)
         for idx, sc in enumerate(scenarios):
@@ -381,13 +381,13 @@ def plot_trajectories(topo_name: str, scenarios: list[str], trajectories: dict, 
                     linewidth=widths.get(p_name, 1.8),
                 )
             if metric == "mlu":
-                ax.axhline(0.90, color="red", linestyle=":", alpha=0.7, label="Ngưỡng nghẽn (0.90)" if idx == 0 else "")
+                ax.axhline(0.90, color="red", linestyle=":", alpha=0.7, label="Congestion Threshold (0.90)" if idx == 0 else "")
 
             ax.set_title(sc_titles.get(sc, sc), fontsize=10, fontweight="bold")
             if col == 0:
                 ax.set_ylabel(ylabel, fontsize=9.5, fontweight="bold")
             if row == 1:
-                ax.set_xlabel("Thời gian (Bước 0 .. 99)", fontsize=9.5)
+                ax.set_xlabel("Simulation Step (t = 0 .. 99)", fontsize=9.5)
             ax.grid(True, linestyle="--", alpha=0.45)
             if idx == 0:
                 ax.legend(loc="upper right", framealpha=0.9, fontsize=8)
