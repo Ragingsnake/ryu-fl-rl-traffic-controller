@@ -123,10 +123,18 @@ class NSFNETRoutingEnv(gym.Env):
         failure_prob: float = 0.0,
         domain_data_dir: str | None = None,
         num_managed_od: int = 20,
+        loss_weight: float = 3.0,
+        calm_excess_delay_weight: float | None = None,
+        congestion_threshold: float | None = None,
+        mlu_weight: float | None = None,
     ):
         super().__init__()
         self.surge_prob = surge_prob
         self.failure_prob = failure_prob
+        self.loss_weight = float(loss_weight)
+        self.custom_calm_delay = calm_excess_delay_weight
+        self.custom_thresh = congestion_threshold
+        self.custom_mlu_w = mlu_weight
 
         # --- 1. Load Topology ---
         self.topology = nx.DiGraph()
@@ -135,6 +143,17 @@ class NSFNETRoutingEnv(gym.Env):
 
         for node in topo_data["nodes"]:
             self.topology.add_node(node["id"])
+
+        is_sparse_ring = (len(self.topology.nodes) == 12)  # Abilene sparse ring
+        self.calm_excess_delay_weight = (
+            self.custom_calm_delay if self.custom_calm_delay is not None else (2.5 if is_sparse_ring else 0.8)
+        )
+        self.congestion_threshold = (
+            self.custom_thresh if self.custom_thresh is not None else (0.78 if is_sparse_ring else 0.65)
+        )
+        self.mlu_weight = (
+            self.custom_mlu_w if self.custom_mlu_w is not None else (0.5 if is_sparse_ring else 1.0)
+        )
 
         self.edges = []
         for link in topo_data["links"]:
@@ -381,8 +400,12 @@ class NSFNETRoutingEnv(gym.Env):
             prop_delay = self.topology[e[0]][e[1]]["delay"]
             cap_e = self.topology[e[0]][e[1]]["capacity"]
 
-            # Queuing delay (M/M/1: d_queue = u_e / (C * (1 - u_e)), C in bps -> convert to ms)
-            q_delay = (u_e / (cap_e * (1.0 - u_e))) * 1e3 if u_e < 0.95 else MAX_QUEUE_DELAY_MS
+            # Queuing delay (M/M/1: d_queue = (L * u_e) / (C * (1 - u_e)), L=1500B MTU -> convert to ms)
+            if u_e < 0.98:
+                pkt_bits = 12000.0  # 1500 bytes standard MTU
+                q_delay = min((pkt_bits * u_e / (cap_e * (1.0 - u_e))) * 1e3, MAX_QUEUE_DELAY_MS)
+            else:
+                q_delay = MAX_QUEUE_DELAY_MS
             link_delays[idx] = prop_delay + q_delay
 
             # Packet loss
@@ -431,11 +454,11 @@ class NSFNETRoutingEnv(gym.Env):
         churn_penalty = 0.08 * action_churn
 
         # State-dependent delay penalty:
-        # When network is uncongested (MLU < 0.65), penalize taking alternate paths that add propagation delay.
-        # When network is congested (MLU >= 0.65), relax excess delay penalty so agent can reroute to eliminate packet loss.
-        delay_weight = 0.8 if mlu < 0.65 else 0.3
+        # When network is uncongested (< threshold), penalize taking alternate paths that add propagation delay.
+        # When network is congested (>= threshold), relax excess delay penalty so agent can reroute to eliminate packet loss.
+        delay_weight = self.calm_excess_delay_weight if mlu < self.congestion_threshold else 0.3
 
-        reward = -(1.0 * mlu + 0.5 * avg_delay_norm + delay_weight * excess_delay + 40.0 * avg_loss + churn_penalty)
+        reward = -(self.mlu_weight * mlu + 0.5 * avg_delay_norm + delay_weight * excess_delay + self.loss_weight * avg_loss + churn_penalty)
 
         # i. Check done
         all_congested = np.all(self.link_utils > 0.95)
