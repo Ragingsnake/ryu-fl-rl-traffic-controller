@@ -208,56 +208,56 @@ def draw_topology_diagram_v3(topo_key, output_path):
     # =========================================================================
     # TIER 1: CENTRAL MANAGEMENT PLANE (Cloud / Central NOC)
     # =========================================================================
-    top_box = FancyBboxPatch((10, 75.5), 80, 16.5, boxstyle="round,pad=0.8,rounding_size=2.0",
+    top_box = FancyBboxPatch((13.0, 75.5), 77.0, 16.5, boxstyle="round,pad=0.8,rounding_size=2.0",
                              ec="#0284c7", fc="#f8fafc", lw=2, zorder=2)
     ax.add_patch(top_box)
     
-    ax.text(50, 89.5, "GLOBAL MANAGEMENT PLANE  (Central Cloud / ISP NOC)",
+    ax.text(51.5, 89.5, "GLOBAL MANAGEMENT PLANE  (Central Cloud / ISP NOC)",
             fontsize=12, fontweight='bold', ha='center', va='center', color="#0369a1")
 
     # 1. Global FL Server
-    fl_srv_box = FancyBboxPatch((13, 77.2), 22, 9.2, boxstyle="round,pad=0.5,rounding_size=1.2",
+    fl_srv_box = FancyBboxPatch((15.0, 77.2), 21.0, 9.2, boxstyle="round,pad=0.5,rounding_size=1.2",
                                 ec="#0284c7", fc="#ffffff", lw=1.5, zorder=3)
     ax.add_patch(fl_srv_box)
-    ax.text(24, 83.7, "Global FL Server", fontsize=10.5, fontweight='bold', ha='center', va='center', color='#0f172a')
-    ax.text(24, 81.2, "• FedAdam / FedAvg", fontsize=8.5, ha='center', va='center', color='#475569')
-    ax.text(24, 79.0, "• Aggregates weights ΔW", fontsize=8, ha='center', va='center', color='#64748b')
+    ax.text(25.5, 83.7, "Global FL Server", fontsize=10.5, fontweight='bold', ha='center', va='center', color='#0f172a')
+    ax.text(25.5, 81.2, "• FedAdam / FedAvg", fontsize=8.5, ha='center', va='center', color='#475569')
+    ax.text(25.5, 79.0, "• Aggregates weights ΔW", fontsize=8, ha='center', va='center', color='#64748b')
 
     # 2. RecurrentPPO Agent
-    rl_box = FancyBboxPatch((38, 77.2), 25, 9.2, boxstyle="round,pad=0.5,rounding_size=1.2",
+    rl_box = FancyBboxPatch((38.5, 77.2), 24.5, 9.2, boxstyle="round,pad=0.5,rounding_size=1.2",
                             ec="#16a34a", fc="#ffffff", lw=1.5, zorder=3)
     ax.add_patch(rl_box)
-    ax.text(50.5, 83.7, "RecurrentPPO TE Agent", fontsize=10.5, fontweight='bold', ha='center', va='center', color='#0f172a')
-    ax.text(50.5, 81.2, "• Actor-Critic with LSTM", fontsize=8.5, ha='center', va='center', color='#475569')
-    ax.text(50.5, 79.0, "• Computes global TE paths", fontsize=8, ha='center', va='center', color='#64748b')
+    ax.text(50.7, 83.7, "RecurrentPPO TE Agent", fontsize=10.5, fontweight='bold', ha='center', va='center', color='#0f172a')
+    ax.text(50.7, 81.2, "• Actor-Critic with LSTM", fontsize=8.5, ha='center', va='center', color='#475569')
+    ax.text(50.7, 79.0, "• Computes global TE paths", fontsize=8, ha='center', va='center', color='#64748b')
 
     # 3. Admission Guard
-    guard_box = FancyBboxPatch((66, 77.2), 21, 9.2, boxstyle="round,pad=0.5,rounding_size=1.2",
+    guard_box = FancyBboxPatch((65.5, 77.2), 22.0, 9.2, boxstyle="round,pad=0.5,rounding_size=1.2",
                                ec="#dc2626", fc="#ffffff", lw=1.5, zorder=3)
     ax.add_patch(guard_box)
     ax.text(76.5, 83.7, "Admission Guard", fontsize=10.5, fontweight='bold', ha='center', va='center', color='#0f172a')
     ax.text(76.5, 81.2, "• Projected Load Verifier", fontsize=8.5, ha='center', va='center', color='#475569')
     ax.text(76.5, 79.0, "• Fallback to Shortest Path", fontsize=8, ha='center', va='center', color='#64748b')
 
-    # Side badges for Transfer & Fine-Tuning
+    # Side badges for Transfer & Fine-Tuning (Ample breathing room, zero collision!)
     if topo_key == 'nsfnet':
-        t_box = FancyBboxPatch((1.5, 76), 7.5, 15.5, boxstyle="round,pad=0.4,rounding_size=1.0",
+        t_box = FancyBboxPatch((1.5, 76.0), 8.2, 15.5, boxstyle="round,pad=0.3,rounding_size=1.0",
                                ec="#9333ea", fc="#faf5ff", lw=1.5, zorder=3)
         ax.add_patch(t_box)
-        ax.text(5.25, 88.0, "GÉANT", fontsize=9, fontweight='bold', ha='center', va='center', color='#7e22ce')
-        ax.text(5.25, 85.5, "Weights", fontsize=8.5, ha='center', va='center', color='#7e22ce')
-        ax.text(5.25, 81.0, "Zero-Shot\nTransfer\n&\nFine-Tune", fontsize=7.5, ha='center', va='center', color='#6b21a8')
-        arrow = FancyArrowPatch((9.2, 83.5), (12.8, 83.5), arrowstyle='->', mutation_scale=15, color='#9333ea', lw=2)
+        ax.text(5.6, 88.0, "GÉANT", fontsize=9, fontweight='bold', ha='center', va='center', color='#7e22ce')
+        ax.text(5.6, 85.5, "Weights", fontsize=8.5, ha='center', va='center', color='#7e22ce')
+        ax.text(5.6, 81.0, "Zero-Shot\nTransfer\n&\nFine-Tune", fontsize=7.5, ha='center', va='center', color='#6b21a8')
+        arrow = FancyArrowPatch((9.9, 83.5), (14.6, 83.5), arrowstyle='->', mutation_scale=15, color='#9333ea', lw=2)
         ax.add_patch(arrow)
 
     elif topo_key == 'abilene':
-        t_box = FancyBboxPatch((1.5, 76), 7.5, 15.5, boxstyle="round,pad=0.4,rounding_size=1.0",
+        t_box = FancyBboxPatch((1.5, 76.0), 8.2, 15.5, boxstyle="round,pad=0.3,rounding_size=1.0",
                                ec="#9333ea", fc="#faf5ff", lw=1.5, zorder=3)
         ax.add_patch(t_box)
-        ax.text(5.25, 88.0, "GÉANT", fontsize=9, fontweight='bold', ha='center', va='center', color='#7e22ce')
-        ax.text(5.25, 85.5, "Weights", fontsize=8.5, ha='center', va='center', color='#7e22ce')
-        ax.text(5.25, 80.5, "Zero-Padding\n(174d → 75d)\n&\nFine-Tune", fontsize=7, ha='center', va='center', color='#6b21a8')
-        arrow = FancyArrowPatch((9.2, 83.5), (12.8, 83.5), arrowstyle='->', mutation_scale=15, color='#9333ea', lw=2)
+        ax.text(5.6, 88.0, "GÉANT", fontsize=9, fontweight='bold', ha='center', va='center', color='#7e22ce')
+        ax.text(5.6, 85.5, "Weights", fontsize=8.5, ha='center', va='center', color='#7e22ce')
+        ax.text(5.6, 80.5, "Zero-Padding\n(174d → 75d)\n&\nFine-Tune", fontsize=7, ha='center', va='center', color='#6b21a8')
+        arrow = FancyArrowPatch((9.9, 83.5), (14.6, 83.5), arrowstyle='->', mutation_scale=15, color='#9333ea', lw=2)
         ax.add_patch(arrow)
 
     # =========================================================================
