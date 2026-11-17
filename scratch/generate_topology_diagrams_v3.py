@@ -80,39 +80,62 @@ ABILENE_CURVATURES = {
     (1, 4): -0.15,   # ATLA <---> HSTN: curves gently along the south
 }
 
-# GÉANT (22 nodes)
+# GÉANT (22 nodes) - Clustered into 3 clean, balanced, non-overlapping regional domains:
+# Cluster A (North-West Europe on Left), Cluster B (Central Europe in Center), Cluster C (South/Peripheral on Right)
 GEANT_COORDS = {
-    11: (13, 40),  # IE
-    21: (22, 39),  # UK
-    7: (26, 27),   # FR
-    1: (32, 37),   # BE
-    15: (35, 45),  # NL
-    16: (39, 49),  # NO
-    19: (48, 49),  # SE
-    4: (43, 33),   # DE
-    2: (36, 24),   # CH
-    3: (52, 34),   # CZ
-    0: (54, 25),   # AT
-    17: (63, 42),  # PL
-    10: (64, 25),  # HU
-    20: (50, 16),  # SI
-    9: (58, 15),   # HR
-    18: (11, 14),  # PT
-    6: (19, 16),   # ES
-    14: (33, 20),  # LU
-    13: (44, 18),  # IT
-    5: (47, 42),   # DK
-    8: (75, 14),   # GR
-    12: (87, 12),  # IL
+    # Domain A (Left: x in [13, 31])
+    11: (14, 43),  # IE
+    21: (24, 43),  # UK
+    1: (30, 32),   # BE
+    15: (22, 32),  # NL
+    7: (15, 21),   # FR
+    16: (17, 33),  # NO
+    19: (26, 21),  # SE
+    
+    # Domain B (Center: x in [42, 62])
+    4: (44, 43),   # DE
+    17: (58, 43),  # PL
+    3: (51, 33),   # CZ
+    2: (43, 31),   # CH
+    10: (60, 31),  # HU
+    0: (49, 21),   # AT
+    20: (44, 14),  # SI
+    9: (57, 14),   # HR
+    
+    # Domain C (Right: x in [71, 89])
+    5: (73, 43),   # DK
+    14: (86, 43),  # LU
+    6: (73, 30),   # ES
+    18: (86, 30),  # PT
+    13: (73, 19),  # IT
+    8: (86, 19),   # GR
+    12: (79, 13),  # IL
 }
 
 GEANT_CURVATURES = {
-    (12, 13): -0.28,  # IL <---> IT: curves across the Mediterranean
-    (17, 19): 0.22,   # PL <---> SE: curves over the Baltic
-    (1, 21): 0.15,    # BE <---> UK: curves over the North Sea
-    (7, 13): -0.18,   # FR <---> IT: curves south of Alps
-    (4, 17): 0.15,    # DE <---> PL: slight curve
-    (5, 16): 0.15,    # DK <---> NO: curves over water
+    # Intra-cluster curvatures to ensure clean clearance
+    (0, 3): 0.12,     # AT <-> CZ
+    (0, 20): -0.12,   # AT <-> SI
+    (11, 7): -0.12,   # IE <-> FR
+    (1, 15): 0.12,    # BE <-> NL
+    
+    # Cluster A <-> Cluster B
+    (7, 2): -0.15,    # FR <-> CH
+    (7, 4): 0.15,     # FR <-> DE
+    (15, 4): 0.12,    # NL <-> DE
+    (19, 17): -0.15,  # SE <-> PL
+    
+    # Cluster A <-> Cluster C (Arched over/under Central Cluster B)
+    (1, 14): 0.28,    # BE <-> LU: curves over the top of Cluster B
+    (15, 14): 0.32,   # NL <-> LU: curves over the top of Cluster B
+    (16, 5): 0.24,    # NO <-> DK: curves over the top of Cluster B
+    (19, 5): 0.20,    # SE <-> DK: curves over the top of Cluster B
+    (7, 6): -0.28,    # FR <-> ES: curves under the bottom of Cluster B
+    (7, 13): -0.25,   # FR <-> IT: curves under the bottom of Cluster B
+    
+    # Cluster B <-> Cluster C
+    (4, 5): 0.15,     # DE <-> DK
+    (2, 13): -0.15,   # CH <-> IT
 }
 
 # =============================================================================
