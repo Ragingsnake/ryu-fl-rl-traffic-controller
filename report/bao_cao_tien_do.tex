@@ -1,7 +1,12 @@
 \documentclass[11pt,a4paper]{article}
 
-\usepackage[utf8]{inputenc}
-\usepackage[T5,T1]{fontenc}
+\usepackage{iftex}
+\ifPDFTeX
+  \usepackage[utf8]{inputenc}
+  \usepackage[T5,T1]{fontenc}
+\else
+  \usepackage{fontspec}
+\fi
 \usepackage[vietnamese,english]{babel}
 \usepackage[a4paper,top=20mm,bottom=20mm,left=25mm,right=20mm]{geometry}
 
@@ -35,6 +40,11 @@
 \titleformat{\section}{\large\bfseries}{\thesection.}{0.5em}{}
 \titleformat{\subsection}{\normalsize\bfseries}{\thesubsection.}{0.5em}{}
 
+\renewcommand{\topfraction}{0.9}
+\renewcommand{\bottomfraction}{0.8}
+\renewcommand{\textfraction}{0.05}
+\renewcommand{\floatpagefraction}{0.85}
+
 \begin{document}
 \selectlanguage{vietnamese}
 
@@ -43,19 +53,11 @@
 \end{center}
 
 \vspace{0.4cm}
-
-% ==============================================================================
-% 1. NỘI DUNG ĐỀ TÀI
-% ==============================================================================
 \section{Nội dung đề tài}
 
 Đề tài tập trung nghiên cứu, thiết kế và hiện thực hóa hệ thống dự đoán lưu lượng và điều khiển lưu lượng chủ động (Traffic Engineering) trong mạng diện rộng dựa trên sự kết hợp giữa học liên kết (Federated Learning) và học tăng cường sâu (Deep Reinforcement Learning).
 
 Mô hình học máy dự báo mức sử dụng liên kết từ dữ liệu phân tán tại các miền mạng thông qua thuật toán tổng hợp FedAdam mà không cần chia sẻ dữ liệu gốc, bảo đảm tính riêng tư. Tác tử RecurrentPPO kết hợp kết quả dự đoán với trạng thái mạng hiện tại để ra quyết định chọn đường tối ưu trên tập K-Shortest Paths cho các luồng lưu lượng lớn, kết hợp cơ chế rơ-le trễ Schmitt-Trigger chống rung giật tuyến và cơ chế tự động chuyển hướng tức thời khi có sự cố đứt liên kết nhằm tối ưu hóa hiệu quả sử dụng tài nguyên và nâng cao chất lượng dịch vụ.
-
-% ==============================================================================
-% 2. CÁC NỘI DUNG ĐÃ THỰC HIỆN
-% ==============================================================================
 \section{Các nội dung đã thực hiện}
 
 \subsection{Xây dựng mô hình mô phỏng mạng}
@@ -79,29 +81,29 @@ Về thuật toán tổng hợp, máy chủ FL Server áp dụng thuật toán \
 \centering
 \caption{\textit{Bảng siêu tham số cấu hình mô hình Federated TrafficLSTM và thuật toán tổng hợp FedAdam.}}
 \label{tab:fl_hyperparameters}
-\small
-\renewcommand{\arraystretch}{1.18}
+\footnotesize
+\renewcommand{\arraystretch}{1.02}
 \begin{tabularx}{\textwidth}{@{} p{4.6cm} c c X @{}}
 \toprule
-\textbf{Tham số (Parameter)} & \textbf{Ký hiệu} & \textbf{Giá trị} & \textbf{Mô tả kỹ thuật \& Ý nghĩa} \\
+\textbf{Tham số (Parameter)} & \textbf{Ký hiệu} & \textbf{Giá trị} & \textbf{Mô tả ngắn gọn} \\
 \midrule
 \multicolumn{4}{@{}l}{\textbf{1. Architecture \& Sequence Parameters (TrafficLSTM)}} \\
-Lookback Window & $T$ & 12 steps & Chuỗi quan sát 3 giờ quá khứ ($12 \times 15\text{ phút}$). \\
-Prediction Horizon & $H$ & 3 steps & Khoảng nhìn trước 45 phút ($3 \times 15\text{ phút}$) cho RL. \\
-LSTM Layers & $L$ & 2 layers & Học phụ thuộc thời gian và tính tuần hoàn tải mạng. \\
-Hidden Dimension & $d_{\text{hidden}}$ & 64 units & Dung lượng biểu diễn tối ưu, triệt tiêu nguy cơ quá khớp. \\
-Dropout Rate & $p_{\text{drop}}$ & 0.2 & Điều hòa kết nối giữa 2 tầng LSTM chống overfit. \\
-Output Projection Head & FC & Linear & Chiếu trạng thái ẩn: $64 \to (H \times F_{\text{in}})$. \\
-Dynamic Feature Padding & -- & Zero-Padding & Chuẩn hóa kích thước liên kết giữa các miền dị thể. \\
+Lookback Window & $T$ & 12 steps & 12 bước quan sát quá khứ (3 giờ). \\
+Prediction Horizon & $H$ & 3 steps & 3 bước dự báo tương lai (45 phút). \\
+LSTM Layers & $L$ & 2 layers & Số tầng LSTM trích xuất đặc trưng chuỗi. \\
+Hidden Dimension & $d_{\text{hidden}}$ & 64 units & Kích thước vector trạng thái ẩn. \\
+Dropout Rate & $p_{\text{drop}}$ & 0.2 & Tỷ lệ ngắt kết nối chống quá khớp. \\
+Output Projection Head & FC & Linear & Chiếu tuyến tính: $64 \to (H \times F_{\text{in}})$. \\
+Dynamic Feature Padding & -- & Zero-Padding & Đệm 0 đồng bộ số chiều liên kết giữa các miền. \\
 \midrule
 \multicolumn{4}{@{}l}{\textbf{2. Client Training \& FedAdam Optimization}} \\
-Mini-batch Size & $B_{\text{FL}}$ & 32 samples & Kích thước lô huấn luyện cục bộ tại mỗi miền mạng. \\
-Local Epochs & $E$ & 5 epochs & Cân bằng giữa tính toán biên và băng thông truyền thông. \\
-Local Learning Rate & $\eta_{\text{local}}$ & $1 \times 10^{-3}$ & Bộ tối ưu Adam, hàm mất mát sai số bình phương (MSE). \\
-Global Learning Rate & $\eta_{\text{global}}$ & $1 \times 10^{-3}$ & Cập nhật mô hình toàn cục trên máy chủ điều phối. \\
-FedAdam Momentum & $\beta_1, \beta_2$ & 0.9, 0.99 & Bù đắp trôi dạt trọng số do dữ liệu phân tán Non-IID. \\
-Numerical Stability ($\tau$) & $\tau$ & $1 \times 10^{-3}$ & Tránh hiện tượng chia cho 0 trong bộ tiền điều kiện. \\
-Global Communication Rounds & $R$ & 50 rounds & Đạt trạng thái hội tụ với sai số dự báo $\text{MAE} < 0.05$. \\
+Mini-batch Size & $B_{\text{FL}}$ & 32 samples & Kích thước lô huấn luyện tại client. \\
+Local Epochs & $E$ & 5 epochs & Số lượt huấn luyện cục bộ mỗi vòng. \\
+Local Learning Rate & $\eta_{\text{local}}$ & $1 \times 10^{-3}$ & Tốc độ học mô hình cục bộ (Adam, MSE). \\
+Global Learning Rate & $\eta_{\text{global}}$ & $1 \times 10^{-3}$ & Tốc độ học tổng hợp toàn cục. \\
+FedAdam Momentum & $\beta_1, \beta_2$ & 0.9, 0.99 & Hệ số động lượng thuật toán FedAdam. \\
+Numerical Stability ($\tau$) & $\tau$ & $1 \times 10^{-3}$ & Hằng số ổn định số học tránh chia cho 0. \\
+Global Communication Rounds & $R$ & 50 rounds & Số vòng tổng hợp tham số toàn cục. \\
 \bottomrule
 \end{tabularx}
 \end{table}
@@ -124,7 +126,7 @@ Global Communication Rounds & $R$ & 50 rounds & Đạt trạng thái hội tụ 
 \begin{figure}[H]
     \centering
     \includegraphics[width=0.96\textwidth]{figures/fig_lstm_ppo_env.png}
-    \caption{\textit{Sơ đồ tích hợp hệ thống điều khiển lưu lượng chủ động: Dữ liệu tải quá khứ được mô hình Federated TrafficLSTM dự báo và nạp vào không gian trạng thái của môi trường Gymnasium (State Space Injection), cung cấp đầu vào cho tác tử RecurrentPPO đưa ra quyết định định tuyến tối ưu khép kín thông qua bộ điều khiển SDN.}}
+    \caption{\textit{Sơ đồ vòng lặp điều khiển lưu lượng chủ động khép kín giữa FL-LSTM, RecurrentPPO và SDN.}}
     \label{fig:lstm_ppo_env}
 \end{figure}
 
@@ -132,29 +134,29 @@ Global Communication Rounds & $R$ & 50 rounds & Đạt trạng thái hội tụ 
 \centering
 \caption{\textit{Bảng cấu hình siêu tham số mô hình định tuyến \texttt{RecurrentPPO}.}}
 \label{tab:rl_hyperparameters}
-\small
-\renewcommand{\arraystretch}{1.18}
+\footnotesize
+\renewcommand{\arraystretch}{1.02}
 \begin{tabularx}{\textwidth}{@{} p{4.6cm} c c X @{}}
 \toprule
-\textbf{Tham số (Parameter)} & \textbf{Ký hiệu} & \textbf{Giá trị} & \textbf{Mô tả kỹ thuật} \\
+\textbf{Tham số (Parameter)} & \textbf{Ký hiệu} & \textbf{Giá trị} & \textbf{Mô tả ngắn gọn} \\
 \midrule
 \multicolumn{4}{@{}l}{\textbf{1. Policy Network Architecture (MlpLstmPolicy)}} \\
-Policy Class & -- & \texttt{MlpLstm} & Actor-Critic tích hợp tầng nhớ trạng thái ẩn LSTM. \\
-LSTM Hidden Units & $d_{\text{lstm}}$ & 128 units & Tạo quán tính hành động (Action Inertia) chống rung giật. \\
-Actor Network ($\pi_\theta$) & MLP & $[256, 128]$ & Đầu ra phân phối xác suất Softmax chọn tuyến Yen $K=3$. \\
-Critic Network ($V_\phi$) & MLP & $[256, 128]$ & Đầu ra vô hướng ước lượng hàm giá trị trạng thái $V(\mathbf{s}_t)$. \\
+Policy Class & -- & \texttt{MlpLstm} & Mạng Actor-Critic có bộ nhớ ẩn LSTM. \\
+LSTM Hidden Units & $d_{\text{lstm}}$ & 128 units & Kích thước vector trạng thái ẩn LSTM. \\
+Actor Network ($\pi_\theta$) & MLP & $[256, 128]$ & Đầu ra xác suất chọn tuyến ($K=3$). \\
+Critic Network ($V_\phi$) & MLP & $[256, 128]$ & Đầu ra ước lượng giá trị trạng thái $V(\mathbf{s}_t)$. \\
 \midrule
 \multicolumn{4}{@{}l}{\textbf{2. RecurrentPPO Optimization \& GAE}} \\
-Rollout Buffer & $N_{\text{steps}}$ & 1024 steps & Thu thập 128 bước trên 8 môi trường mạng song song. \\
-Mini-batch Size & $B_{\text{RL}}$ & 64 samples & Kích thước lô chuyển trạng thái trong mỗi pha tối ưu. \\
-Update Epochs & $K_{\text{epoch}}$ & 10 epochs & Số lượt huấn luyện lặp lại trên bộ đệm rollout. \\
-Learning Rate Schedule & $\alpha$ & $3 \cdot 10^{-4} \to 1 \cdot 10^{-4}$ & Suy giảm tuyến tính theo tiến trình học tổng thể. \\
-Discount Factor & $\gamma$ & 0.95 & Cân bằng giữa tối ưu tức thời và rủi ro nghẽn dài hạn. \\
-GAE Coefficient & $\lambda_{\text{GAE}}$ & 0.95 & Kiểm soát phương sai và độ lệch của hàm ước lượng lợi thế. \\
-PPO Clip Range & $\epsilon_{\text{clip}}$ & 0.2 & Giới hạn biên độ thay đổi chính sách trong vùng tin cậy. \\
-Value Loss Coefficient & $c_1$ & 0.5 & Trọng số tổn thất hàm giá trị trong tổng hàm mất mát. \\
-Entropy Coefficient & $c_2$ & 0.001 & Kiểm soát thăm dò, ưu tiên khai thác chính sách tối ưu. \\
-Max Gradient Norm & $g_{\text{max}}$ & 0.5 & Giới hạn chuẩn gradient chống bùng nổ gradient trong LSTM. \\
+Rollout Buffer & $N_{\text{steps}}$ & 1024 steps & Bộ đệm rollout (8 môi trường song song $\times$ 128 bước). \\
+Mini-batch Size & $B_{\text{RL}}$ & 64 samples & Kích thước mẫu cập nhật gradient. \\
+Update Epochs & $K_{\text{epoch}}$ & 10 epochs & Số lượt tối ưu chính sách mỗi đợt rollout. \\
+Learning Rate Schedule & $\alpha$ & $3 \cdot 10^{-4} \to 1 \cdot 10^{-4}$ & Suy giảm tuyến tính theo tiến trình học. \\
+Discount Factor & $\gamma$ & 0.95 & Hệ số chiết khấu phần thưởng tương lai. \\
+GAE Coefficient & $\lambda_{\text{GAE}}$ & 0.95 & Hệ số ước lượng lợi thế (GAE). \\
+PPO Clip Range & $\epsilon_{\text{clip}}$ & 0.2 & Ngưỡng cắt tỉ số xác suất chính sách. \\
+Value Loss Coefficient & $c_1$ & 0.5 & Trọng số mất mát của Critic trong tổng hàm loss. \\
+Entropy Coefficient & $c_2$ & 0.001 & Trọng số entropy khuyến khích khám phá. \\
+Max Gradient Norm & $g_{\text{max}}$ & 0.5 & Ngưỡng cắt chuẩn gradient chống bùng nổ. \\
 \bottomrule
 \end{tabularx}
 \end{table}
@@ -248,51 +250,62 @@ Ngoài ra, hệ thống đã hiện thực hóa cơ chế chuyển giao không m
     \label{fig:training_all}
 \end{figure}
 
-\subsection*{Đánh giá thực nghiệm Trường hợp 1: Mạng NSFNET (14 nút, 42 liên kết)}
-Đối sánh đa chính sách trên mạng NSFNET qua 6 kịch bản thực nghiệm (Hình \ref{fig:nsfnet_all} và Bảng \ref{tab:nsfnet_summary}):
-\begin{itemize}[leftmargin=1.5em, itemsep=0.3ex]
-    \item \textbf{Diễn biến MLU (Hình \ref{fig:nsfnet_all}a):} Ở trạng thái tải chu kỳ T1, OSPF có MLU trung bình $0.727$ (đỉnh $0.793$). Tác tử nội miền In-Domain chứng minh ưu thế vượt bậc khi phân tán các luồng voi sang các tuyến rảnh rỗi, ghìm sâu MLU xuống $0.571$ (đỉnh $0.625$, giảm $21.5\%$). Chính sách chuyển giao GEANT Transfer kích hoạt bộ lọc bảo vệ an toàn ($\text{MLU} < 0.65$), bám sát mức tải an toàn của OSPF ($0.727$). Mô hình tinh chỉnh GEANT Finetune đạt MLU $0.722$. Khi mạng quá tải ở T3 (+50\% tải), OSPF bị dồn nghẽn nghiêm trọng ($\text{MLU} = 0.914$, đỉnh $1.142$); tác tử In-Domain kiểm soát xuất sắc ở mức $0.717$ (đỉnh $0.901$); mô hình Finetuned giữ vững MLU ở $0.907$ (đỉnh $1.140$).
-    \item \textbf{Độ trễ trung bình (Hình \ref{fig:nsfnet_all}b) \& Hiện tượng T1:} Trên mạng NSFNET, chiều dài sợi quang của các liên kết đơn (1-hop) phân bố bất đối xứng; các chặng xuyên lục địa có trễ vật lý rất lớn ($6 \to 12$ trễ 19 ms, $12 \to 1$ trễ 21 ms). Tác tử In-Domain đã tự khám phá các tuyến đa chặng (multi-hop) có tổng trễ vật lý thấp hơn nhiều (chỉ 9 ms), hạ trễ toàn mạng xuống $\mathbf{8.01}$ ms (thấp hơn OSPF $9.30$ ms). GEANT Transfer bám sát mốc $9.30$ ms của OSPF. Mô hình GEANT Finetuned đạt trễ $9.87$ ms do độ nhạy phòng ngừa nghẽn từ không gian đệm zero-padding ($0.23\%$ churn). Khi nghẽn nặng ở T3, OSPF phình hàng đợi làm trễ vọt lên $18.53$ ms; tác tử In-Domain giữ trễ phẳng mịn ở $\mathbf{8.01}$ ms (giảm $56.8\%$ trễ); mô hình Finetuned giảm trễ xuống $\mathbf{14.49}$ ms (giảm $21.8\%$ trễ so với OSPF).
-    \item \textbf{Tỷ lệ mất gói (Hình \ref{fig:nsfnet_all}c) \& Bước đột phá của GEANT Finetune:} Dưới áp lực dồn tải và sự cố đứt cáp, OSPF để xảy ra rớt gói nghiêm trọng: $18.46\%$ ở T3, $35.99\%$ ở T5 và $15.60\%$ ở T6. Tác tử In-Domain triệt tiêu $98.3\%$ rớt gói ở T3 (còn $\mathbf{0.31\%}$) và cắt giảm $63.4\%$ mất gói ở T5 (còn $\mathbf{13.17\%}$). Đáng chú ý, mô hình tinh chỉnh \textbf{GEANT Finetune cắt giảm hơn một nửa lượng gói mất ở T3} (từ $18.46\%$ xuống $\mathbf{9.22\%}$, giảm $50.1\%$). Khi đứt liên kết lõi ở T5, Finetune giảm mất gói từ $35.99\%$ xuống $\mathbf{19.66\%}$ (cắt giảm $45.4\%$ rớt gói). Đặc biệt tại T6 (lệch pha ngày đêm), Finetune đạt hiệu năng tốt nhất toàn mạng với tỷ lệ mất gói chỉ $\mathbf{11.19\%}$ và độ trễ thấp nhất $\mathbf{15.35}$ ms.
-\end{itemize}
+\clearpage
 
-\begin{table}[htbp]
+\subsection*{Đánh giá thực nghiệm Trường hợp 1: Mạng NSFNET (14 nút, 42 liên kết)}
+Đối sánh đa chính sách trên mạng NSFNET qua 6 kịch bản thực nghiệm (Bảng \ref{tab:nsfnet_summary} và Hình \ref{fig:nsfnet_all}):
+
+\begin{table}[H]
 \centering
-\caption{\textit{Bảng tổng hợp đối sánh định lượng trên mạng NSFNET: OSPF, In-Domain, GEANT Transfer và GEANT Finetune (Trung bình qua 3 random seeds).}}
+\caption{\textit{Bảng tổng hợp đối sánh định lượng trên mạng NSFNET qua 6 kịch bản (Trung bình qua 3 random seeds).}}
 \label{tab:nsfnet_summary}
 \footnotesize
-\setlength{\tabcolsep}{3pt}
-\renewcommand{\arraystretch}{1.15}
-\begin{tabularx}{\textwidth}{@{} l l c c c >{\raggedright\arraybackslash}X @{}}
+\setlength{\tabcolsep}{4pt}
+\renewcommand{\arraystretch}{0.85}
+\begin{tabular*}{\textwidth}{@{\extracolsep{\fill}} l l c c c @{}}
 \toprule
-\textbf{Kịch bản} & \textbf{Mô hình} & \textbf{MLU TB (Đỉnh)} & \textbf{Trễ (ms)} & \textbf{Mất gói} & \textbf{Hiệu quả so với OSPF} \\
+\textbf{Kịch bản} & \textbf{Chính sách} & \textbf{MLU TB (Đỉnh)} & \textbf{Độ trễ (ms)} & \textbf{Mất gói (\%)} \\
 \midrule
-\textbf{T1} (Chu kỳ) & In-Domain & $\mathbf{0.571}$ ($\mathbf{0.625}$) & $\mathbf{8.01}$ & $0.00\%$ & Giảm $21.5\%$ MLU, trễ tối ưu (chọn đường tắt đa chặng). \\
-& Transfer & $0.727$ ($0.793$) & $9.30$ & $0.00\%$ & Bám sát OSPF theo ngưỡng bảo vệ an toàn. \\
-& Finetuned & $0.722$ ($0.792$) & $9.87$ & $0.00\%$ & Nhạy cảm phòng ngừa nghẽn ($0.23\%$ churn). \\
+\textbf{T1} (Chu kỳ) & OSPF-SPF & $0.727$ ($0.793$) & $9.30$ & $0.00\%$ \\
+& In-Domain & $\mathbf{0.571}$ ($\mathbf{0.625}$) & $\mathbf{8.01}$ & $0.00\%$ \\
+& GEANT Transfer & $0.727$ ($0.793$) & $9.30$ & $0.00\%$ \\
+& GEANT Finetuned & $0.722$ ($0.792$) & $9.87$ & $0.00\%$ \\
 \midrule
-\textbf{T2} (Đột biến) & In-Domain & $\mathbf{0.623}$ ($1.151$) & $\mathbf{8.47}$ & $\mathbf{0.89\%}$ & Cắt giảm $62.6\%$ rớt gói, hạ trễ $20.0\%$. \\
-& Transfer & $0.764$ ($1.151$) & $10.59$ & $2.38\%$ & Vận hành an toàn bám sát đường cơ sở. \\
-& Finetuned & $0.759$ ($1.151$) & $11.14$ & $2.38\%$ & Ổn định luồng khi tải đột biến. \\
+\textbf{T2} (Đột biến) & OSPF-SPF & $0.776$ ($1.255$) & $10.59$ & $2.38\%$ \\
+& In-Domain & $\mathbf{0.623}$ ($1.151$) & $\mathbf{8.47}$ & $\mathbf{0.89\%}$ \\
+& GEANT Transfer & $0.764$ ($1.151$) & $10.59$ & $2.38\%$ \\
+& GEANT Finetuned & $0.759$ ($1.151$) & $11.14$ & $2.38\%$ \\
 \midrule
-\textbf{T3} (Tăng tải) & In-Domain & $\mathbf{0.717}$ ($\mathbf{0.901}$) & $\mathbf{8.01}$ & $\mathbf{0.31\%}$ & Triệt tiêu $98.3\%$ mất gói, triệt tiêu phình hàng đợi. \\
-& Transfer & $0.914$ ($1.142$) & $18.53$ & $18.46\%$ & Vận hành an toàn không vỡ chính sách. \\
-& Finetuned & $0.907$ ($1.140$) & $\mathbf{14.49}$ & $\mathbf{9.22\%}$ & \textbf{Cắt giảm $50.1\%$ mất gói, hạ trễ $4.04$ ms}. \\
+\textbf{T3} (Tăng tải) & OSPF-SPF & $0.914$ ($1.142$) & $18.53$ & $18.46\%$ \\
+& In-Domain & $\mathbf{0.717}$ ($\mathbf{0.901}$) & $\mathbf{8.01}$ & $\mathbf{0.31\%}$ \\
+& GEANT Transfer & $0.914$ ($1.142$) & $18.53$ & $18.46\%$ \\
+& GEANT Finetuned & $0.907$ ($1.140$) & $\mathbf{14.49}$ & $\mathbf{9.22\%}$ \\
 \midrule
-\textbf{T4} (Dồn tải) & In-Domain & $\mathbf{0.637}$ ($1.950$) & $\mathbf{9.95}$ & $2.50\%$ & Phân tán luồng voi hiệu quả. \\
-& Transfer & $0.786$ ($1.950$) & $11.08$ & $2.50\%$ & Duy trì thông lượng an toàn. \\
-& Finetuned & $0.781$ ($1.950$) & $11.44$ & $\mathbf{2.25\%}$ & Giảm nhẹ rớt gói trong đỉnh dồn tải. \\
+\textbf{T4} (Dồn tải) & OSPF-SPF & $0.786$ ($1.950$) & $11.08$ & $2.50\%$ \\
+& In-Domain & $\mathbf{0.637}$ ($1.950$) & $\mathbf{9.95}$ & $2.50\%$ \\
+& GEANT Transfer & $0.786$ ($1.950$) & $11.08$ & $2.50\%$ \\
+& GEANT Finetuned & $0.781$ ($1.950$) & $11.44$ & $\mathbf{2.25\%}$ \\
 \midrule
-\textbf{T5} (Đứt link) & In-Domain & $\mathbf{0.820}$ ($\mathbf{1.051}$) & $\mathbf{14.35}$ & $\mathbf{13.17\%}$ & Giảm $63.4\%$ mất gói, SDN Failover tức thời. \\
-& Transfer & $0.934$ ($1.150$) & $22.15$ & $27.81\%$ & Giảm $22.7\%$ rớt gói so với OSPF ($35.99\%$). \\
-& Finetuned & $0.857$ ($1.071$) & $\mathbf{18.88}$ & $\mathbf{19.66\%}$ & \textbf{Cắt giảm $45.4\%$ rớt gói, kiểm soát trễ vượt trội}. \\
+\textbf{T5} (Đứt link) & OSPF-SPF & $0.934$ ($1.150$) & $22.15$ & $35.99\%$ \\
+& In-Domain & $\mathbf{0.820}$ ($\mathbf{1.051}$) & $\mathbf{14.35}$ & $\mathbf{13.17\%}$ \\
+& GEANT Transfer & $0.934$ ($1.150$) & $22.15$ & $27.81\%$ \\
+& GEANT Finetuned & $0.857$ ($1.071$) & $\mathbf{18.88}$ & $\mathbf{19.66\%}$ \\
 \midrule
-\textbf{T6} (Lệch pha) & In-Domain & $\mathbf{0.607}$ ($\mathbf{1.188}$) & $18.24$ & $14.17\%$ & Giảm $21.4\%$ MLU trung bình. \\
-& Transfer & $0.772$ ($1.473$) & $18.42$ & $17.42\%$ & Thích ứng linh hoạt chu kỳ ngày đêm. \\
-& Finetuned & $0.766$ ($1.471$) & $\mathbf{15.35}$ & $\mathbf{11.19\%}$ & \textbf{Tốt nhất toàn mạng: giảm $28.3\%$ mất gói, trễ thấp nhất}. \\
+\textbf{T6} (Lệch pha) & OSPF-SPF & $0.772$ ($1.473$) & $18.42$ & $15.60\%$ \\
+& In-Domain & $\mathbf{0.607}$ ($\mathbf{1.188}$) & $18.24$ & $14.17\%$ \\
+& GEANT Transfer & $0.772$ ($1.473$) & $18.42$ & $17.42\%$ \\
+& GEANT Finetuned & $0.766$ ($1.471$) & $\mathbf{15.35}$ & $\mathbf{11.19\%}$ \\
 \bottomrule
-\end{tabularx}
+\end{tabular*}
 \end{table}
+
+\begin{itemize}[leftmargin=1.5em, itemsep=0pt, parsep=0pt, topsep=2pt]
+    \item \textbf{Diễn biến MLU (Hình \ref{fig:nsfnet_all}a):} Ở chu kỳ danh định T1, OSPF có MLU trung bình $0.727$ (đỉnh $0.793$). Tác tử In-Domain phân tán luồng voi sang tuyến phụ, hạ MLU xuống $0.571$ (đỉnh $0.625$, giảm $21.5\%$). Chính sách GEANT Transfer kích hoạt bộ lọc an toàn ($\text{MLU} < 0.65$), bám sát OSPF ($0.727$); mô hình Finetuned đạt $0.722$. Khi quá tải T3 (+50\% tải), OSPF dồn nghẽn cục bộ ($\text{MLU} = 0.914$, đỉnh $1.142$); In-Domain kiểm soát tải ở mức $0.717$ (đỉnh $0.901$) và Finetuned duy trì $0.907$ (đỉnh $1.140$).
+    \item \textbf{Độ trễ trung bình (Hình \ref{fig:nsfnet_all}b):} Trên mạng NSFNET, chiều dài sợi quang giữa các cặp nút chênh lệch lớn. Tác tử In-Domain chọn tuyến đa chặng tối ưu trễ lan truyền, hạ trễ toàn mạng xuống $8.01$ ms (thấp hơn $9.30$ ms của OSPF). GEANT Transfer bám sát mốc $9.30$ ms; Finetuned đạt $9.87$ ms. Khi nghẽn nặng ở T3, hàng đợi OSPF phình to khiến trễ tăng vọt lên $18.53$ ms; In-Domain duy trì trễ ổn định $8.01$ ms (giảm $56.8\%$), còn Finetuned giảm trễ xuống $14.49$ ms (giảm $21.8\%$).
+    \item \textbf{Tỷ lệ mất gói (Hình \ref{fig:nsfnet_all}c):} Khi dồn tải và đứt cáp, OSPF chịu mất gói nặng: $18.46\%$ ở T3, $35.99\%$ ở T5 và $15.60\%$ ở T6. Tác tử In-Domain cắt giảm $98.3\%$ gói mất ở T3 (còn $0.31\%$) và $63.4\%$ ở T5 (còn $13.17\%$). Mô hình GEANT Finetune hạ tỷ lệ mất gói ở T3 xuống $9.22\%$ (giảm $50.1\%$) và ở T5 xuống $19.66\%$ (giảm $45.4\%$). Tại kịch bản T6 (lệch pha), Finetune đạt tỷ lệ mất gói $11.19\%$ và trễ $15.35$ ms.
+\end{itemize}
+
+\clearpage
 
 \begin{figure}[p]
     \centering
@@ -313,41 +326,54 @@ Ngoài ra, hệ thống đã hiện thực hóa cơ chế chuyển giao không m
         \includegraphics[width=\textwidth]{figures/overview_nsfnet_loss.pdf}
         \caption{Tỷ lệ mất gói (\%)}
     \end{subfigure}
-    \caption{\textit{Toàn cảnh 6 kịch bản trên mạng NSFNET: Đối sánh giữa OSPF, In-Domain, GEANT Transfer và GEANT Finetune (Lưới 2x3 vector chuẩn).}}
+    \caption{\textit{Toàn cảnh 6 kịch bản trên mạng NSFNET: MLU, Độ trễ và Tỷ lệ Mất gói (Lưới 2x3 vector chuẩn).}}
     \label{fig:nsfnet_all}
 \end{figure}
 
 \clearpage
 
 \subsection*{Đánh giá thực nghiệm Trường hợp 2: Mạng GÉANT (22 nút, 72 liên kết)}
-Phân tích kết quả định lượng chi tiết trên mạng lõi GÉANT (Hình \ref{fig:geant_all} và Bảng \ref{tab:geant_summary}):
-\begin{itemize}[leftmargin=1.5em, itemsep=0.3ex]
-    \item \textbf{Diễn biến MLU (Hình \ref{fig:geant_all}a):} Nhờ cấu trúc đồ thị dày và dung lượng lớn (2.5 Gbps), tác tử phát huy tối đa năng lực phân bổ luồng, giảm $17.7\%$ MLU ở T1 ($0.598$ so với $0.727$ của OSPF). Ở các kịch bản áp lực cao T2, T3, T4, đường cong MLU của tác tử luôn thấp hơn OSPF rõ rệt (ở T3 hạ từ $0.914$ xuống $0.694$, đỉnh hạ từ $1.142$ xuống $0.835$), duy trì an toàn tuyệt đối dưới ngưỡng nghẽn $0.90$.
-    \item \textbf{Độ trễ trung bình (Hình \ref{fig:geant_all}b):} Ở kịch bản nhàn rỗi T1, OSPF đạt trễ lan truyền tối thiểu ($10.40$ ms) do đi đường ngắn nhất tuyệt đối, trong khi tác tử có trễ tương đương ($10.70$ ms). Khi mạng nghẽn nặng ở T3 và T6, trễ của OSPF vọt lên $19.23$ ms và $26.09$ ms; tác tử giữ trễ ổn định ở $10.76$ ms (T3) và $15.30$ ms (giảm $41.4\%$ độ trễ ở T6).
-    \item \textbf{Tỷ lệ mất gói (Hình \ref{fig:geant_all}c):} OSPF bộc lộ nhược điểm lớn khi dồn tải với tỷ lệ mất gói $3.97\%$ ở T2, $16.75\%$ ở T3 và $23.34\%$ ở T6; tác tử FL-DRL giảm mất gói hơn 7 lần ở T2 (xuống $0.55\%$), \textbf{xóa sổ hoàn toàn $100\%$ mất gói ở T3 về đúng $0.00\%$}, và giảm mạnh mất gói ở T6 xuống $8.20\%$ (cắt giảm $64.9\%$ tỷ lệ rớt gói).
-\end{itemize}
+Phân tích kết quả định lượng chi tiết trên mạng lõi GÉANT (Bảng \ref{tab:geant_summary} và Hình \ref{fig:geant_all}):
 
-\begin{table}[htbp]
+\begin{table}[H]
 \centering
 \caption{\textit{Bảng tổng hợp đối sánh định lượng trên mạng GÉANT qua 6 kịch bản (Trung bình qua 3 random seeds).}}
 \label{tab:geant_summary}
 \footnotesize
-\setlength{\tabcolsep}{3.5pt}
-\renewcommand{\arraystretch}{1.18}
-\begin{tabularx}{\textwidth}{@{} l c c c c >{\raggedright\arraybackslash}X @{}}
+\setlength{\tabcolsep}{4pt}
+\renewcommand{\arraystretch}{0.88}
+\begin{tabular*}{\textwidth}{@{\extracolsep{\fill}} l l c c c @{}}
 \toprule
-\textbf{Kịch bản} & \textbf{MLU TB (Đỉnh)} & \textbf{Trễ TB (ms)} & \textbf{Mất gói (\%)} & \textbf{Churn} & \textbf{Hiệu quả so với OSPF} \\
-& \text{OSPF / DRL} & \text{OSPF / DRL} & \text{OSPF / DRL} & \text{DRL} & \\
+\textbf{Kịch bản} & \textbf{Chính sách} & \textbf{MLU TB (Đỉnh)} & \textbf{Độ trễ (ms)} & \textbf{Mất gói (\%)} \\
 \midrule
-\textbf{T1} (Chu kỳ)   & $0.727$ ($0.796$) / $\mathbf{0.598}$ ($\mathbf{0.657}$) & $\mathbf{10.40}$ / $10.70$ & $0.00\%$ / $0.00\%$ & $0.13\%$ & Giảm $17.7\%$ MLU, trễ tương đương. \\
-\textbf{T2} (Đột biến) & $0.776$ ($1.255$) / $\mathbf{0.638}$ ($\mathbf{1.031}$) & $12.62$ / $\mathbf{10.95}$ & $3.97\%$ / $\mathbf{0.55\%}$ & $0.16\%$ & Giảm $86.1\%$ mất gói, giảm trễ $13.2\%$. \\
-\textbf{T3} (Tăng tải) & $0.914$ ($1.142$) / $\mathbf{0.694}$ ($\mathbf{0.835}$) & $19.23$ / $\mathbf{10.76}$ & $16.75\%$ / $\mathbf{0.00\%}$ & $0.17\%$ & \textbf{Xóa sổ $100\%$ rớt gói}, hạ trễ $44.0\%$. \\
-\textbf{T4} (Dồn tải)  & $0.780$ ($1.883$) / $\mathbf{0.645}$ ($\mathbf{1.632}$) & $12.32$ / $\mathbf{12.06}$ & $3.00\%$ / $\mathbf{2.20\%}$ & $0.20\%$ & Giảm $17.3\%$ MLU, giảm $26.7\%$ mất gói. \\
-\textbf{T5} (Đứt link) & $0.751$ ($0.836$) / $\mathbf{0.721}$ ($\mathbf{0.872}$) & $\mathbf{10.88}$ / $11.50$ & $0.00\%$ / $0.03\%$ & $0.13\%$ & SDN Failover tức thời bảo vệ toàn vẹn luồng. \\
-\textbf{T6} (Lệch pha) & $0.771$ ($1.478$) / $\mathbf{0.588}$ ($\mathbf{1.070}$) & $26.09$ / $\mathbf{15.30}$ & $23.34\%$ / $\mathbf{8.20\%}$ & $0.20\%$ & Cắt giảm $64.9\%$ mất gói, hạ $41.4\%$ trễ. \\
+\textbf{T1} (Chu kỳ) & OSPF-SPF & $0.727$ ($0.796$) & $\mathbf{10.40}$ & $0.00\%$ \\
+& Proactive FL-DRL & $\mathbf{0.598}$ ($\mathbf{0.657}$) & $10.70$ & $0.00\%$ \\
+\midrule
+\textbf{T2} (Đột biến) & OSPF-SPF & $0.776$ ($1.255$) & $12.62$ & $3.97\%$ \\
+& Proactive FL-DRL & $\mathbf{0.638}$ ($\mathbf{1.031}$) & $\mathbf{10.95}$ & $\mathbf{0.55\%}$ \\
+\midrule
+\textbf{T3} (Tăng tải) & OSPF-SPF & $0.914$ ($1.142$) & $19.23$ & $16.75\%$ \\
+& Proactive FL-DRL & $\mathbf{0.694}$ ($\mathbf{0.835}$) & $\mathbf{10.76}$ & $\mathbf{0.00\%}$ \\
+\midrule
+\textbf{T4} (Dồn tải) & OSPF-SPF & $0.780$ ($1.883$) & $12.32$ & $3.00\%$ \\
+& Proactive FL-DRL & $\mathbf{0.645}$ ($\mathbf{1.632}$) & $\mathbf{12.06}$ & $\mathbf{2.20\%}$ \\
+\midrule
+\textbf{T5} (Đứt link) & OSPF-SPF & $0.751$ ($0.836$) & $\mathbf{10.88}$ & $0.00\%$ \\
+& Proactive FL-DRL & $\mathbf{0.721}$ ($\mathbf{0.872}$) & $11.50$ & $0.03\%$ \\
+\midrule
+\textbf{T6} (Lệch pha) & OSPF-SPF & $0.771$ ($1.478$) & $26.09$ & $23.34\%$ \\
+& Proactive FL-DRL & $\mathbf{0.588}$ ($\mathbf{1.070}$) & $\mathbf{15.30}$ & $\mathbf{8.20\%}$ \\
 \bottomrule
-\end{tabularx}
+\end{tabular*}
 \end{table}
+
+\begin{itemize}[leftmargin=1.5em, itemsep=0pt, parsep=0pt, topsep=2pt]
+    \item \textbf{Diễn biến MLU (Hình \ref{fig:geant_all}a):} Nhờ cấu trúc đồ thị dày và dung lượng lớn (2.5 Gbps), tác tử phân bổ luồng hiệu quả, giảm $17.7\%$ MLU ở kịch bản T1 ($0.598$ so với $0.727$ của OSPF). Ở các kịch bản áp lực cao T2, T3 và T4, MLU của tác tử duy trì ở mức an toàn dưới ngưỡng 0.90 (ở T3 hạ từ $0.914$ xuống $0.694$, giá trị đỉnh hạ từ $1.142$ xuống $0.835$).
+    \item \textbf{Độ trễ trung bình (Hình \ref{fig:geant_all}b):} Ở kịch bản danh định T1, OSPF đạt trễ lan truyền thấp nhất ($10.40$ ms) do sử dụng tuyến ngắn nhất, trong khi tác tử có độ trễ tương đương ($10.70$ ms). Khi mạng chịu tải cao ở T3 và T6, độ trễ của OSPF tăng lên $19.23$ ms và $26.09$ ms; trong khi đó, tác tử duy trì độ trễ ổn định ở mức $10.76$ ms (T3) và $15.30$ ms (giảm $41.4\%$ so với OSPF ở T6).
+    \item \textbf{Tỷ lệ mất gói (Hình \ref{fig:geant_all}c):} OSPF chịu ảnh hưởng nghẽn với tỷ lệ mất gói $3.97\%$ ở T2, $16.75\%$ ở T3 và $23.34\%$ ở T6. Tác tử FL-DRL giảm tỷ lệ mất gói xuống $0.55\%$ ở T2, triệt tiêu mất gói ở kịch bản T3 về mức $0.00\%$, và giảm tỷ lệ mất gói ở T6 xuống $8.20\%$ (giảm $64.9\%$ so với OSPF).
+\end{itemize}
+
+\clearpage
 
 \begin{figure}[p]
     \centering
@@ -375,50 +401,59 @@ Phân tích kết quả định lượng chi tiết trên mạng lõi GÉANT (H�
 \clearpage
 
 \subsection*{Đánh giá thực nghiệm Trường hợp 3: Mạng Abilene (12 nút, 30 liên kết) - So sánh Đối đầu và Chuyển giao}
-Đối sánh toàn diện giữa OSPF, Tác tử Nội miền (In-Domain Agent), Tác tử Chuyển giao không mẫu (GEANT Transfer Agent) và Tác tử Tinh chỉnh thích ứng (GEANT Finetuned Agent) (Hình \ref{fig:abilene_all} và Bảng \ref{tab:abilene_summary}):
-\begin{itemize}[leftmargin=1.5em, itemsep=0.3ex]
-    \item \textbf{Cực tiểu lý thuyết độ trễ OSPF ở kịch bản T1:} Mạng Abilene có cấu trúc vành đai lục địa thưa thớt (12 nút, 30 liên kết); các đường rẽ phụ (Path 1, Path 2) buộc gói tin phải đi vòng ngược chiều toàn bộ lục địa Bắc Mỹ, làm tăng độ trễ lan truyền vật lý thuần túy thêm $+13.73$ ms đến $+23.27$ ms (tăng $114\% - 194\%$). Khi mạng ở trạng thái tải an toàn T1 ($\text{MLU} < 0.65$), hàng đợi hoàn toàn rỗng và không xảy ra mất gói, do đó tuyến OSPF ngắn nhất ($12.00$ ms) chính là cực tiểu vật lý tuyệt đối. Mọi hành vi rẽ luồng của AI đều làm tăng độ trễ mà không mang lại lợi ích chống nghẽn nào. Nhờ bộ lọc Projected Load Verification, mô hình Transfer bám sát OSPF đạt $12.37$ ms; mô hình Finetuned có độ nhạy phòng ngừa nghẽn cao hơn một chút ($0.33\%$ churn) đạt $12.93$ ms.
-    \item \textbf{Hiệu năng đột phá của GEANT Finetune ở kịch bản quá tải T3 (+50\% tải):} Khi lưu lượng toàn mạng tăng lũy tiến $+50\%$, OSPF bị bão hòa hàng đợi đẩy mất gói lên $21.80\%$ và trễ vọt lên $26.72$ ms. Mô hình nội miền In-Domain giảm mất gói xuống $17.64\%$. Đặc biệt, mô hình tinh chỉnh \textbf{GEANT Finetune giành chiến thắng áp đảo trước tất cả các mô hình}: ghìm tỷ lệ mất gói xuống mức kỷ lục $\mathbf{12.26\%}$ (cắt giảm $43.8\%$ rớt gói so với OSPF, vượt trội hơn cả mô hình nội miền $17.64\%$), đồng thời kéo độ trễ trung bình xuống thấp nhất toàn mạng ($\mathbf{20.35}$ ms so với $26.72$ ms của OSPF).
-    \item \textbf{Khả năng chống chịu sự cố đứt cáp T5 và biến động T6:} Khi đứt liên kết lõi Atlanta--Washington ở bước $t=40$ (T5), hệ thống kích hoạt SDN Failover chuyển tuyến tức thời, bảo đảm không làm đứt gãy luồng dữ liệu, duy trì trễ và tỷ lệ mất gói tương đương OSPF. Ở kịch bản ngày bất thường T6 (lệch pha sáng đông chiều vắng), mô hình nội miền In-Domain đạt trễ tốt nhất $37.76$ ms; mô hình GEANT Finetune duy trì tỷ lệ mất gói ổn định $29.96\%$ và trễ $39.71$ ms.
-\end{itemize}
+Đối sánh toàn diện giữa OSPF, Tác tử Nội miền (In-Domain), Tác tử Chuyển giao không mẫu (GEANT Transfer) và Tác tử Tinh chỉnh thích ứng (GEANT Finetuned) (Bảng \ref{tab:abilene_summary} và Hình \ref{fig:abilene_all}):
 
-\begin{table}[htbp]
+\begin{table}[H]
 \centering
 \caption{\textit{Bảng tổng hợp đối sánh định lượng trên mạng Abilene: OSPF, In-Domain, GEANT Transfer và GEANT Finetune.}}
 \label{tab:abilene_summary}
 \footnotesize
-\setlength{\tabcolsep}{3pt}
-\renewcommand{\arraystretch}{1.06}
-\begin{tabularx}{\textwidth}{@{} l l c c c >{\raggedright\arraybackslash}X @{}}
+\setlength{\tabcolsep}{4pt}
+\renewcommand{\arraystretch}{0.85}
+\begin{tabular*}{\textwidth}{@{\extracolsep{\fill}} l l c c c @{}}
 \toprule
-\textbf{Kịch bản} & \textbf{Mô hình} & \textbf{MLU TB (Đỉnh)} & \textbf{Trễ (ms)} & \textbf{Mất gói} & \textbf{Hiệu quả so với OSPF} \\
+\textbf{Kịch bản} & \textbf{Chính sách} & \textbf{MLU TB (Đỉnh)} & \textbf{Độ trễ (ms)} & \textbf{Mất gói (\%)} \\
 \midrule
-\textbf{T1} (Chu kỳ) & In-Domain & $\mathbf{0.721}$ ($\mathbf{0.785}$) & $12.40$ & $0.00\%$ & Giảm nhẹ MLU; trễ lan truyền tương đương. \\
-& Transfer & $0.725$ ($0.790$) & $\mathbf{12.37}$ & $0.00\%$ & Bám sát OSPF cực tiểu trễ lan truyền vật lý ($12.00$ ms). \\
-& Finetuned & $0.722$ ($0.788$) & $12.93$ & $0.00\%$ & Độ trễ tăng nhẹ do nhạy cảm định tuyến ($0.33\%$ churn). \\
+\textbf{T1} (Chu kỳ) & OSPF-SPF & $0.725$ ($0.790$) & $\mathbf{12.00}$ & $0.00\%$ \\
+& In-Domain & $\mathbf{0.721}$ ($\mathbf{0.785}$) & $12.40$ & $0.00\%$ \\
+& GEANT Transfer & $0.725$ ($0.790$) & $12.37$ & $0.00\%$ \\
+& GEANT Finetuned & $0.722$ ($0.788$) & $12.93$ & $0.00\%$ \\
 \midrule
-\textbf{T2} (Đột biến) & In-Domain & $0.787$ ($1.435$) & $14.73$ & $4.58\%$ & Cân bằng tải phân tán. \\
-& Transfer & $0.789$ ($1.419$) & $\mathbf{14.59}$ & $4.36\%$ & Bộ lọc an toàn giữ ổn định luồng. \\
-& Finetuned & $\mathbf{0.788}$ ($1.419$) & $15.15$ & $\mathbf{4.33\%}$ & Chống sốc tải đột biến tốt. \\
+\textbf{T2} (Đột biến) & OSPF-SPF & $0.789$ ($1.419$) & $\mathbf{14.00}$ & $4.36\%$ \\
+& In-Domain & $\mathbf{0.787}$ ($1.435$) & $14.73$ & $4.58\%$ \\
+& GEANT Transfer & $0.789$ ($1.419$) & $14.59$ & $4.36\%$ \\
+& GEANT Finetuned & $0.788$ ($1.419$) & $15.15$ & $\mathbf{4.33\%}$ \\
 \midrule
-\textbf{T3} (Tăng tải) & In-Domain & $0.906$ ($1.134$) & $23.09$ & $17.64\%$ & Giảm $19.1\%$ rớt gói so với OSPF ($21.80\%$). \\
-& Transfer & $0.912$ ($1.136$) & $25.67$ & $20.66\%$ & Vận hành an toàn, không sụp đổ chính sách. \\
-& Finetuned & $\mathbf{0.907}$ ($\mathbf{1.127}$) & $\mathbf{20.35}$ & $\mathbf{12.26\%}$ & \textbf{Vượt trội toàn diện: giảm $43.8\%$ rớt gói, trễ thấp nhất}. \\
+\textbf{T3} (Tăng tải) & OSPF-SPF & $0.912$ ($1.136$) & $26.72$ & $21.80\%$ \\
+& In-Domain & $\mathbf{0.906}$ ($1.134$) & $23.09$ & $17.64\%$ \\
+& GEANT Transfer & $0.912$ ($1.136$) & $25.67$ & $20.66\%$ \\
+& GEANT Finetuned & $0.907$ ($\mathbf{1.127}$) & $\mathbf{20.35}$ & $\mathbf{12.26\%}$ \\
 \midrule
-\textbf{T4} (Dồn tải) & In-Domain & $\mathbf{0.783}$ ($2.000$) & $14.40$ & $\mathbf{3.67\%}$ & Hấp thụ tốt tải đột biến cực hạn. \\
-& Transfer & $0.787$ ($2.000$) & $\mathbf{14.37}$ & $\mathbf{3.67\%}$ & Bám sát OSPF chống quá tải liên kết phụ. \\
-& Finetuned & $0.785$ ($2.000$) & $14.93$ & $\mathbf{3.67\%}$ & Vận hành ổn định tương đương. \\
+\textbf{T4} (Dồn tải) & OSPF-SPF & $0.787$ ($2.000$) & $\mathbf{14.00}$ & $\mathbf{3.67\%}$ \\
+& In-Domain & $\mathbf{0.783}$ ($2.000$) & $14.40$ & $\mathbf{3.67\%}$ \\
+& GEANT Transfer & $0.787$ ($2.000$) & $14.37$ & $\mathbf{3.67\%}$ \\
+& GEANT Finetuned & $0.785$ ($2.000$) & $14.93$ & $\mathbf{3.67\%}$ \\
 \midrule
-\textbf{T5} (Đứt link) & In-Domain & $\mathbf{1.012}$ ($1.294$) & $43.08$ & $32.00\%$ & SDN Failover tức thời. \\
-& Transfer & $1.014$ ($1.294$) & $\mathbf{41.93}$ & $32.00\%$ & Bảo toàn định tuyến khi đứt cáp lõi. \\
-& Finetuned & $1.014$ ($1.294$) & $42.01$ & $32.00\%$ & Ổn định luồng sau cô lập liên kết đứt. \\
+\textbf{T5} (Đứt link) & OSPF-SPF & $1.014$ ($1.294$) & $42.00$ & $32.00\%$ \\
+& In-Domain & $\mathbf{1.012}$ ($1.294$) & $43.08$ & $32.00\%$ \\
+& GEANT Transfer & $1.014$ ($1.294$) & $\mathbf{41.93}$ & $32.00\%$ \\
+& GEANT Finetuned & $1.014$ ($1.294$) & $42.01$ & $32.00\%$ \\
 \midrule
-\textbf{T6} (Lệch pha) & In-Domain & $\mathbf{0.764}$ ($\mathbf{1.461}$) & $\mathbf{37.76}$ & $\mathbf{29.60\%}$ & Hạ nhẹ trễ trong pha dồn tải sáng. \\
-& Transfer & $0.769$ ($1.462$) & $41.06$ & $30.47\%$ & Khả năng thích ứng ổn định. \\
-& Finetuned & $0.767$ ($1.458$) & $39.71$ & $29.96\%$ & Giảm rớt gói trong chu kỳ bất đối xứng. \\
+\textbf{T6} (Lệch pha) & OSPF-SPF & $0.771$ ($1.462$) & $43.97$ & $33.17\%$ \\
+& In-Domain & $\mathbf{0.764}$ ($\mathbf{1.461}$) & $\mathbf{37.76}$ & $\mathbf{29.60\%}$ \\
+& GEANT Transfer & $0.769$ ($1.462$) & $41.06$ & $30.47\%$ \\
+& GEANT Finetuned & $0.767$ ($1.458$) & $39.71$ & $29.96\%$ \\
 \bottomrule
-\end{tabularx}
+\end{tabular*}
 \end{table}
+
+\begin{itemize}[leftmargin=1.5em, itemsep=0pt, parsep=0pt, topsep=2pt]
+    \item \textbf{Cực tiểu lý thuyết độ trễ OSPF ở kịch bản T1:} Mạng Abilene có cấu trúc vành đai thưa thớt (12 nút, 30 liên kết); các đường rẽ phụ buộc gói tin đi vòng làm tăng trễ lan truyền vật lý từ $+13.73$ ms đến $+23.27$ ms. Khi tải ở mức an toàn T1 ($\text{MLU} < 0.65$), hàng đợi rỗng và không mất gói, tuyến OSPF ($12.00$ ms) đạt cực tiểu vật lý. Nhờ cơ chế kiểm tra tải dự phóng, mô hình Transfer duy trì độ trễ sát OSPF ($12.37$ ms); Finetuned đạt $12.93$ ms.
+    \item \textbf{Hiệu năng của GEANT Finetune ở kịch bản quá tải T3 (+50\% tải):} Khi tải tăng $+50\%$, OSPF nghẽn hàng đợi khiến mất gói tăng lên $21.80\%$ và trễ $26.72$ ms. Mô hình In-Domain giảm mất gói xuống $17.64\%$. Mô hình tinh chỉnh GEANT Finetune tối ưu nhất với tỷ lệ mất gói hạ xuống $12.26\%$ (giảm $43.8\%$ so với OSPF), đồng thời duy trì trễ thấp nhất toàn mạng ($20.35$ ms so với $26.72$ ms của OSPF).
+    \item \textbf{Khả năng chống chịu sự cố đứt cáp T5 và biến động T6:} Khi đứt liên kết lõi Atlanta--Washington tại bước $t=40$ (T5), SDN Failover tự động chuyển tuyến bảo vệ luồng, duy trì trễ và mất gói tương đương OSPF. Ở kịch bản T6 (lệch pha ngày đêm), In-Domain đạt trễ $37.76$ ms; GEANT Finetune duy trì tỷ lệ mất gói $29.96\%$ và trễ $39.71$ ms.
+\end{itemize}
+
+\clearpage
 
 \begin{figure}[p]
     \centering
@@ -443,11 +478,9 @@ Phân tích kết quả định lượng chi tiết trên mạng lõi GÉANT (H�
     \label{fig:abilene_all}
 \end{figure}
 
-Hệ thống hiện có thể chạy hoàn chỉnh pipeline thử nghiệm và đánh giá tự động bằng script \texttt{run\_full\_pipeline.py} và \texttt{demo.py}, kết nối trực tiếp giữa môi trường mô phỏng, mô-đun FL và tác tử PPO, xuất đầy đủ dữ liệu CSV và đồ thị trực quan so sánh với OSPF.
+\clearpage
 
-% ==============================================================================
-% 4. CÔNG VIỆC ĐANG THỰC HIỆN
-% ==============================================================================
+Hệ thống hiện có thể chạy hoàn chỉnh pipeline thử nghiệm và đánh giá tự động bằng script \texttt{run\_full\_pipeline.py} và \texttt{demo.py}, kết nối trực tiếp giữa môi trường mô phỏng, mô-đun FL và tác tử PPO, xuất đầy đủ dữ liệu CSV và đồ thị trực quan so sánh với OSPF.
 \section{Công việc đang thực hiện}
 
 Hiện tại, nhóm đang tập trung thực hiện các nội dung công việc sau:
@@ -456,10 +489,6 @@ Hiện tại, nhóm đang tập trung thực hiện các nội dung công việc
     \item \textbf{Mở rộng kiểm thử thực nghiệm trên Mininet thời gian thực:} Tiến hành đo đạc đối sánh với các luồng truyền video streaming UDP và lưu lượng TCP tải nặng để quan sát trực quan phản xạ tái định tuyến của Ryu Controller.
     \item \textbf{Chuẩn bị slide báo cáo và kịch bản demo:} Xây dựng bài thuyết trình bảo vệ khóa luận và hoàn thiện kịch bản demo trực quan trên giao diện giám sát mạng SDN.
 \end{itemize}
-
-% ==============================================================================
-% 5. CÔNG VIỆC DỰ KIẾN TIẾP THEO
-% ==============================================================================
 \section{Công việc dự kiến tiếp theo}
 
 Trong giai đoạn tiếp theo, các công việc dự kiến gồm:
