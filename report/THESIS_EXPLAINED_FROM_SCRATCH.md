@@ -569,7 +569,7 @@ Here is the correct mental model:
 
 ## Diagram 1 — GÉANT (22 Nodes): Only In-Domain FL-DRL
 
-![GÉANT Topology Deployment](figures/topology_deployment_geant.jpg)
+![GÉANT Topology Deployment](figures/topology_deployment_geant.png)
 
 ### What you're seeing:
 | Layer | What it is | In Demo | In Production |
@@ -586,7 +586,7 @@ GÉANT is the **source** topology — the one we train on first. Its weights the
 
 ## Diagram 2 — NSFNET (14 Nodes): Transfer & Fine-Tuning
 
-![NSFNET Topology Deployment](figures/topology_deployment_nsfnet.jpg)
+![NSFNET Topology Deployment](figures/topology_deployment_nsfnet.png)
 
 ### What you're seeing:
 The purple arrows coming **in from the left** represent the cross-topology weight transfer. GÉANT trained a model for 174 input dimensions. NSFNET uses 105 dimensions. The **Zero-Padding trick** makes GÉANT's weights work on NSFNET without retraining:
@@ -611,7 +611,7 @@ GÉANT model (174-dim input) ──zero-pad to 105 slots──► NSFNET (uses 1
 
 ## Diagram 3 — Abilene (12 Nodes): Zero-Padding in Action
 
-![Abilene Topology Deployment](figures/topology_deployment_abilene.jpg)
+![Abilene Topology Deployment](figures/topology_deployment_abilene.png)
 
 ### What you're seeing:
 Abilene is the smallest topology (12 nodes, 30 links = **75-dimensional** input space). GÉANT uses 174 dimensions. The gap is 99 extra dimensions that Abilene doesn't have.
