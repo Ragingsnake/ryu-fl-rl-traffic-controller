@@ -56,20 +56,20 @@
 \section{Nội dung đề tài và Mục tiêu nghiên cứu}
 
 \subsection{Vấn đề thực tiễn và Động lực nghiên cứu}
-Trong các mạng diện rộng (WAN) liên kết nhiều trung tâm dữ liệu và các hệ thống tự trị (Autonomous Systems - ASes), việc tối ưu hóa định tuyến lưu lượng (Traffic Engineering - TE) là nhiệm vụ then chốt nhằm duy trì chất lượng dịch vụ (QoS) theo cam kết SLA. Tuy nhiên, các giải pháp hiện nay đang đối mặt với ba rào cản kỹ thuật nghiêm trọng:
+Trong các mạng diện rộng (WAN) kết nối nhiều trung tâm dữ liệu và các hệ thống tự trị (ASes), việc tối ưu hóa định tuyến lưu lượng (Traffic Engineering - TE) là nhiệm vụ then chốt để duy trì chất lượng dịch vụ (QoS). Tuy nhiên, các giải pháp hiện nay đang đối mặt với ba hạn chế chính:
 \begin{enumerate}[leftmargin=1.5em, itemsep=0.2ex]
-    \item \textbf{Tính bị động của định tuyến truyền thống:} Các giao thức như OSPF hay ECMP chỉ dựa trên độ dài đường truyền vật lý tĩnh. Khi các luồng dữ liệu lớn (Elephant Flows) bùng phát cục bộ, hệ thống không có khả năng nhận biết trước nguy cơ, dẫn đến nghẽn liên kết, phình to hàng đợi viễn thông (Buffer Bloat), tăng trễ phi tuyến và rớt gói tin hàng loạt.
-    \item \textbf{Rào cản quyền riêng tư dữ liệu giữa các miền mạng:} Để dự báo tải liên kết trên quy mô toàn mạng, phương pháp học máy tập trung truyền thống đòi hỏi toàn bộ các miền mạng con phải gửi ma trận lưu lượng thô (Traffic Matrices) về một máy chủ trung tâm. Điều này vi phạm nghiêm trọng chính sách bảo mật dữ liệu khách hàng và bí mật kinh doanh giữa các nhà cung cấp dịch vụ Internet (ISPs).
-    \item \textbf{Độ trễ phản ứng và hiện tượng rung giật tuyến của DRL thuần túy:} Các mô hình học tăng cường sâu (DRL) thông thường chỉ tiếp nhận trạng thái tức thời, dẫn đến phản ứng chậm (chỉ chuyển luồng sau khi mất gói đã xảy ra). Đồng thời, tác tử không trạng thái dễ bị hiện tượng đổi tuyến liên tục (Route Flapping) khi tải bấp bênh quanh ngưỡng, gây xáo trộn thứ tự gói tin và sụp đổ thông lượng phiên truyền TCP.
+    \item Định tuyến truyền thống mang tính bị động: Các giao thức như OSPF hay ECMP chỉ dựa trên độ dài đường truyền tĩnh. Khi xuất hiện các luồng dữ liệu lớn (Elephant Flows), hệ thống không dự báo trước được nguy cơ, dẫn đến nghẽn liên kết, đầy hàng đợi (Buffer Bloat), tăng trễ và mất gói.
+    \item Rào cản chia sẻ dữ liệu giữa các miền mạng: Để dự báo lưu lượng toàn mạng, các phương pháp học máy tập trung đòi hỏi các miền mạng con phải gửi ma trận lưu lượng thô về máy chủ trung tâm. Điều này vi phạm chính sách bảo mật dữ liệu khách hàng và bí mật kinh doanh giữa các nhà cung cấp dịch vụ (ISPs).
+    \item Hạn chế của DRL phản xạ tức thời: Các mô hình học tăng cường sâu (DRL) thông thường chỉ nhìn vào trạng thái tức thời nên phản ứng chậm (chỉ đổi đường sau khi đã nghẽn). Ngoài ra, tác tử không có bộ nhớ ngữ cảnh dễ bị đổi tuyến liên tục (Route Flapping) khi tải dao động nhẹ, làm xáo trộn thứ tự gói tin và giảm tốc độ truyền TCP.
 \end{enumerate}
 
-\subsection{Mục tiêu nghiên cứu cốt lõi}
-Đề tài hướng tới việc giải quyết triệt để các rào cản trên thông qua bốn mục tiêu khoa học và kỹ thuật cụ thể:
+\subsection{Mục tiêu nghiên cứu}
+Đề tài tập trung giải quyết các hạn chế trên thông qua bốn mục tiêu cụ thể:
 \begin{itemize}[leftmargin=1.5em, itemsep=0.3ex]
-    \item \textbf{Mục tiêu 1 (Dự báo tải bảo toàn quyền riêng tư đa miền):} Thiết kế và hiện thực hóa kiến trúc học liên kết (Federated Learning) kết hợp mô hình chuỗi thời gian \texttt{TrafficLSTM} và thuật toán tối ưu hóa máy chủ thích nghi \texttt{FedAdam}. Mô hình cho phép các miền mạng độc lập hợp tác huấn luyện để dự báo trước mức sử dụng liên kết cho 45 phút tiếp theo với sai số $\text{MAE} < 0.05$ mà hoàn toàn không chia sẻ dữ liệu lưu lượng thô ra khỏi ranh giới miền.
-    \item \textbf{Mục tiêu 2 (Điều phối lưu lượng vòng lặp kín chủ động):} Xây dựng cơ chế nạp dự báo (State Space Injection), hợp nhất vector tải dự báo tương lai $\mathbf{\hat{u}}_{t+1}$ vào không gian trạng thái của tác tử học tăng cường sâu \texttt{RecurrentPPO}. Tác tử có khả năng phán đoán sớm nguy cơ nghẽn để chủ động phân bổ lại các luồng voi sang các tuyến thay thế ($K$-Shortest Paths) trước khi hàng đợi gói tin bị đầy.
-    \item \textbf{Mục tiêu 3 (Bảo đảm tính ổn định và an toàn mạng ở mức nhà mạng):} Tích hợp tầng nhớ ẩn LSTM kích thước 128 đơn vị vào mạng chính sách để thiết lập quán tính hành động (Action Inertia), triệt tiêu hoàn toàn rung giật tuyến với tỷ lệ nhảy tuyến duy trì $\text{Churn} < 0.1\%$. Đồng thời, triển khai rào chắn an toàn kiểm tra tải dự phóng (Admission Guardrail) nhằm phát hiện và phủ quyết tức thời các quyết định chuyển luồng nguy hiểm trong thời gian dưới $0.1$ ms.
-    \item \textbf{Mục tiêu 4 (Khả năng thích ứng và chuyển giao tri thức đa topo):} Nghiên cứu thực nghiệm chứng minh khả năng chuyển giao không mẫu (Zero-Shot Transfer) và tinh chỉnh nhanh ít mẫu (Few-Shot Fine-Tuning) của mô hình định tuyến được huấn luyện trên cấu trúc mạng dày phức tạp (GÉANT) sang các topo mạng mục tiêu có cấu trúc hình học khác biệt lớn (NSFNET dạng lưới thưa và Abilene dạng vành đai).
+    \item Dự báo tải liên kết bảo toàn quyền riêng tư đa miền: Xây dựng mô hình học liên kết (Federated Learning) kết hợp \texttt{TrafficLSTM} và thuật toán \texttt{FedAdam}. Các miền mạng hợp tác huấn luyện để dự báo tải liên kết trong 45 phút tới với sai số $\text{MAE} < 0.05$ mà không cần chia sẻ dữ liệu lưu lượng thô.
+    \item Điều phối lưu lượng chủ động theo vòng lặp kín: Đưa vector tải dự báo tương lai $\mathbf{\hat{u}}_{t+1}$ vào trạng thái của tác tử \texttt{RecurrentPPO}, giúp tác tử chủ động phân bổ lại các luồng lớn sang đường phụ ($K$-Shortest Paths) trước khi liên kết chính bị nghẽn.
+    \item Đảm bảo tính ổn định và an toàn định tuyến: Tích hợp tầng nhớ LSTM vào mạng chính sách để tạo quán tính hành động, triệt tiêu hiện tượng rung giật tuyến (giữ tỷ lệ đổi tuyến $\text{Churn} < 0.1\%$). Đồng thời triển khai rào chắn an toàn kiểm tra tải dự phóng để ngăn các quyết định chuyển luồng gây nguy cơ nghẽn.
+    \item Đánh giá khả năng chuyển giao đa topo: Kiểm thử khả năng chuyển giao không mẫu (Zero-Shot) và tinh chỉnh nhanh (Fine-Tuning) của mô hình huấn luyện từ mạng GÉANT sang các topo mạng khác biệt như NSFNET và Abilene.
 \end{itemize}
 
 \section{Các nội dung đã thực hiện}
@@ -77,9 +77,9 @@ Trong các mạng diện rộng (WAN) liên kết nhiều trung tâm dữ liệu
 \subsection{Xây dựng mô hình mô phỏng mạng và trực quan hóa các Topo}
 Hệ thống đã chuẩn hóa và cấu hình mô hình mạng hoàn chỉnh trên cả ba topo thực tế chuẩn quốc tế:
 \begin{itemize}[leftmargin=1.5em, itemsep=0.2ex]
-    \item \textbf{NSFNET (Mạng xương sống Quốc gia Hoa Kỳ):} Gồm 14 router, 42 liên kết có hướng, băng thông chuẩn 1 Gbps, độ trễ lan truyền 2--10 ms. Mạng được chia thành 3 miền FL: Miền Tây (Domain A), Miền Trung (Domain B), và Miền Đông (Domain C).
-    \item \textbf{GÉANT (Mạng nghiên cứu Liên minh Châu Âu):} Cấu trúc đồ thị dạng lưới dày (Dense Mesh) gồm 22 router, 72 liên kết có hướng, băng thông đường trục 2.5 Gbps, độ trễ 1--15 ms. Phân chia thành 3 miền tự trị: Bắc Âu (Domain A), Trung Âu (Domain B), và Nam Âu (Domain C).
-    \item \textbf{Abilene (Mạng vành đai vành thưa thớt Hoa Kỳ):} Cấu trúc đồ thị dạng vành đai thưa (Sparse Ring) gồm 12 router, 30 liên kết có hướng, băng thông 1 Gbps, độ trễ lan truyền trải dài từ 2--15 ms giữa bờ Đông và bờ Tây.
+    \item NSFNET: Gồm 14 router, 42 liên kết có hướng, băng thông chuẩn 1 Gbps, độ trễ lan truyền 2--10 ms. Mạng được chia thành 3 miền: miền Tây (Domain A), miền Trung (Domain B) và miền Đông (Domain C).
+    \item GÉANT: Cấu trúc dạng lưới dày gồm 22 router, 72 liên kết có hướng, băng thông 2.5 Gbps, độ trễ 1--15 ms. Mạng chia thành 3 miền: Bắc Âu (Domain A), Trung Âu (Domain B) và Nam Âu (Domain C).
+    \item Abilene: Cấu trúc vành đai thưa gồm 12 router, 30 liên kết có hướng, băng thông 1 Gbps, độ trễ 2--15 ms giữa bờ Đông và bờ Tây Hoa Kỳ.
 \end{itemize}
 
 Đặc tính cấu trúc và thông số kỹ thuật của ba mô hình mạng được tổng hợp tại Bảng \ref{tab:topo_characteristics}, và kiến trúc triển khai phân miền được trực quan hóa tại Hình \ref{fig:topo_deployments}.
@@ -141,20 +141,20 @@ Kiến trúc tổng thể của hệ thống học liên kết đa miền đư�
     \label{fig:fl_architecture}
 \end{figure}
 
-Đặc tả toán học tường minh về đầu vào, đầu ra và cơ chế tối ưu hóa của hệ thống:
+Chi tiết dữ liệu đầu vào, đầu ra và cơ chế tối ưu hóa:
 \begin{itemize}[leftmargin=1.5em, itemsep=0.2ex]
-    \item \textbf{Ten-xơ đầu vào (Input Tensor):} Tại mỗi miền mạng con $k$, dữ liệu quan sát là ten-xơ 3 chiều $\mathbf{X}_k \in \mathbb{R}^{B \times T \times |\mathcal{E}_k|}$, trong đó $B = 32$ là kích thước mini-batch, $T = 12$ là độ dài cửa sổ trượt quá khứ (tương đương 3 giờ quan sát liên tục với chu kỳ 15 phút), và $|\mathcal{E}_k|$ là số lượng liên kết có hướng trong miền $k$. Mỗi phần tử đại diện cho mức chiếm dụng liên kết thực tế đã chuẩn hóa: $u_t(e) = \frac{\lambda_t(e)}{C(e)} \in [0.0, 1.0]$.
-    \item \textbf{Ten-xơ đầu ra dự báo (Output Tensor):} Mô hình cục bộ dự báo ten-xơ $\mathbf{\hat{Y}}_k \in \mathbb{R}^{B \times H \times |\mathcal{E}_k|}$ với tầm nhìn dự báo $H = 3$ bước thời gian kế tiếp (45 phút nhìn trước), tương ứng với bộ ba vector dự báo mức tải tương lai $[\mathbf{\hat{u}}_{t+1}, \mathbf{\hat{u}}_{t+2}, \mathbf{\hat{u}}_{t+3}]$.
-    \item \textbf{Hàm mất mát cục bộ (Client Loss Function):} Từng miền $k$ tối ưu hóa trọng số mô hình $W_k$ thông qua hàm sai số bình phương trung bình (MSE):
+    \item Dữ liệu đầu vào: Tại mỗi miền mạng $k$, dữ liệu quan sát là mảng 3 chiều $\mathbf{X}_k \in \mathbb{R}^{B \times T \times |\mathcal{E}_k|}$, với kích thước lô $B = 32$, cửa sổ quan sát quá khứ $T = 12$ bước (3 giờ), và $|\mathcal{E}_k|$ là số liên kết có hướng trong miền. Mỗi giá trị là mức chiếm dụng liên kết đã chuẩn hóa: $u_t(e) = \frac{\lambda_t(e)}{C(e)} \in [0.0, 1.0]$.
+    \item Đầu ra dự báo: Mô hình dự báo mảng $\mathbf{\hat{Y}}_k \in \mathbb{R}^{B \times H \times |\mathcal{E}_k|}$ với tầm nhìn $H = 3$ bước kế tiếp (45 phút tới), tương ứng với bộ ba vector tải tương lai $[\mathbf{\hat{u}}_{t+1}, \mathbf{\hat{u}}_{t+2}, \mathbf{\hat{u}}_{t+3}]$.
+    \item Hàm mất mát tại client: Từng miền $k$ huấn luyện mô hình cục bộ bằng hàm sai số bình phương trung bình (MSE):
     \begin{equation}
         \mathcal{L}_{\text{MSE}}(W_k) = \frac{1}{B \cdot H \cdot |\mathcal{E}_k|} \sum_{b=1}^{B} \sum_{h=1}^{H} \sum_{e \in \mathcal{E}_k} \left( u_{t+h}(e) - \hat{u}_{t+h}(e) \right)^2
     \end{equation}
-    \item \textbf{Cơ chế bảo toàn quyền riêng tư và Thuật toán tổng hợp FedAdam:} Sau mỗi vòng huấn luyện cục bộ ($E = 5$ epochs), các client chỉ tải lên máy chủ trung tâm sai phân trọng số $\Delta W_k^{(r)} = W_k^{(r)} - W_{\text{global}}^{(r-1)}$; ma trận lưu lượng khách hàng hoàn toàn không bị chia sẻ. Máy chủ FL Server tổng hợp theo thuật toán \texttt{FedAdam} có tích hợp động lượng hai bậc nhằm khắc phục hiện tượng trôi trọng số do dữ liệu phân tán bị lệch phân phối (Non-IID):
+    \item Cơ chế bảo mật và thuật toán tổng hợp FedAdam: Sau mỗi vòng huấn luyện cục bộ ($E = 5$ epochs), các client chỉ gửi sai phân trọng số $\Delta W_k^{(r)} = W_k^{(r)} - W_{\text{global}}^{(r-1)}$ về máy chủ; dữ liệu lưu lượng nội bộ không bị chia sẻ ra ngoài. Máy chủ FL tổng hợp theo thuật toán \texttt{FedAdam} với động lượng hai bậc để thích ứng với sự khác biệt dữ liệu giữa các miền:
     \begin{align}
         \Delta^{(r)} &= \sum_{k=1}^{K} \frac{n_k}{N} \Delta W_k^{(r)}, \quad m^{(r)} = \beta_1 m^{(r-1)} + (1-\beta_1)\Delta^{(r)} \\
         v^{(r)} &= \beta_2 v^{(r-1)} + (1-\beta_2)(\Delta^{(r)})^2, \quad W_{\text{global}}^{(r)} = W_{\text{global}}^{(r-1)} + \eta_{\text{global}} \frac{m^{(r)}}{\sqrt{v^{(r)}} + \tau}
     \end{align}
-    \item \textbf{Cầu nối sang tác tử RL (Inference Bridge):} Mô-đun \texttt{DomainPredictor} trích xuất vector tải dự báo tức thời ở bước tiếp theo $\mathbf{\hat{u}}_{t+1} \in \mathbb{R}^{|\mathcal{E}_k|}$ và nạp trực tiếp vào không gian trạng thái của tác tử RL: $\mathbf{s}_t = [\mathbf{u}_t \;\parallel\; \mathbf{\hat{u}}_{t+1} \;\parallel\; \mathbf{d}_t]$.
+    \item Cầu nối sang tác tử RL: Vector tải dự báo ở bước kế tiếp $\mathbf{\hat{u}}_{t+1}$ được trích xuất và nạp thẳng vào trạng thái của tác tử RL: $\mathbf{s}_t = [\mathbf{u}_t \;\parallel\; \mathbf{\hat{u}}_{t+1} \;\parallel\; \mathbf{d}_t]$.
 \end{itemize}
 
 \begin{table}[H]
@@ -186,37 +186,37 @@ Global Communication Rounds & $R$ & 50 rounds & Số vòng tổng hợp tham s�
 \end{table}
 
 \subsection{Xây dựng và thiết lập môi trường Reinforcement Learning (RecurrentPPO)}
-Đã hoàn thiện môi trường Gymnasium (\texttt{rl/env.py}) để phục vụ huấn luyện tác tử điều khiển lưu lượng theo cơ chế tối ưu hóa vòng lặp kín (Closed-Loop Autonomous Routing). Thiết lập kỹ thuật của môi trường và tác tử bao gồm các điểm then chốt:
+Môi trường Gymnasium (\texttt{rl/env.py}) phục vụ huấn luyện tác tử điều khiển lưu lượng theo cơ chế vòng lặp kín (Closed-Loop Routing). Thiết lập kỹ thuật gồm các điểm chính:
 
 \begin{itemize}[leftmargin=1.5em, itemsep=0.3ex]
-    \item \textbf{Không gian trạng thái và cơ chế nạp dự báo:} Không gian quan sát của tác tử tại bước $t$ được cấu thành thông qua phép ghép nối đặc trưng (Feature Concatenation) giữa ba thành phần thông tin trọng yếu:
+    \item Không gian trạng thái: Vector quan sát tại mỗi bước thời gian $t$ ghép nối 3 thành phần thông tin:
     \begin{equation}
         \mathbf{s}_t = \left[ \mathbf{u}_t \;\parallel\; \mathbf{\hat{u}}_{t+1} \;\parallel\; \mathbf{d}_t \right] \in \mathbb{R}^{2|\mathcal{E}| + |\mathcal{M}|}
     \end{equation}
-    trong đó $\mathbf{u}_t \in [0, 1]^{|\mathcal{E}|}$ là mức tải thực tế hiện tại của các liên kết, $\mathbf{d}_t \in \mathbb{R}^{|\mathcal{M}|}$ là nhu cầu lưu lượng tức thời của nhóm luồng lớn quản lý, và đặc biệt $\mathbf{\hat{u}}_{t+1} \in [0, 1]^{|\mathcal{E}|}$ là vector tải dự phóng ở bước kế tiếp do mô hình Federated TrafficLSTM cung cấp. Cơ chế nạp dự báo này trang bị cho tác tử năng lực phán đoán chủ động, cho phép điều chuyển luồng giải tỏa nguy cơ tắc nghẽn từ trước khi hàng đợi gói tin bị phình to.
+    trong đó $\mathbf{u}_t$ là mức tải hiện tại của các liên kết, $\mathbf{d}_t$ là nhu cầu lưu lượng của các luồng lớn quản lý, và $\mathbf{\hat{u}}_{t+1}$ là mức tải dự báo ở bước kế tiếp từ mô hình Federated TrafficLSTM. Nhờ vector dự báo này, tác tử có thể nhận biết sớm nguy cơ nghẽn để chủ động đổi hướng luồng trước khi hàng đợi gói tin bị đầy.
     
-    \item \textbf{Không gian hành động đa rời rạc (Multi-Discrete Action Space):} Thay vì điều khiển toàn bộ ma trận lưu lượng (gây bùng nổ tổ hợp), hệ thống áp dụng nguyên lý 80/20 chỉ tập trung kiểm soát nhóm luồng lưu lượng trọng yếu (Elephant Flows / Heavy-Hitters chiếm trên 85\% tổng tải): 20 luồng trên NSFNET, 30 luồng trên GÉANT và 15 luồng trên Abilene. Với mỗi luồng $k \in \mathcal{M}$, thuật toán Yen tiền tính toán $K = 3$ đường đi ngắn nhất không lặp vòng (\texttt{K-Shortest Paths}). Tác tử lựa chọn hành động trong không gian đa rời rạc $\mathcal{A} = \prod_{k=1}^{|\mathcal{M}|} \{0, 1, 2\}$, trong khi các luồng nhỏ còn lại mặc định phân bổ trên tuyến ngắn nhất OSPF.
+    \item Không gian hành động đa rời rạc (MultiDiscrete): Thay vì điều khiển toàn bộ ma trận lưu lượng, hệ thống chỉ tập trung kiểm soát nhóm luồng lớn (chiếm hơn 85\% tổng tải): 20 luồng trên NSFNET, 30 luồng trên GÉANT và 15 luồng trên Abilene. Với mỗi luồng lớn, thuật toán Yen tìm sẵn $K = 3$ đường đi ngắn nhất. Tác tử chọn 1 trong 3 đường cho từng luồng lớn, còn các luồng nhỏ còn lại mặc định chạy trên đường ngắn nhất OSPF.
 \end{itemize}
 
-\subsubsection*{Cơ sở khoa học và động lực lựa chọn thuật toán PPO kết hợp mạng hồi quy LSTM}
-Việc lựa chọn thuật toán \textbf{RecurrentPPO (PPO-LSTM)} thay vì các thuật toán RL khác (DQN, DDPG, SAC) hay mạng truyền thẳng (Feed-Forward MLP) được chứng minh chặt chẽ dựa trên các căn cứ lý thuyết và thực nghiệm sau:
+\subsubsection*{Lý do lựa chọn thuật toán PPO và tầng nhớ LSTM}
+Việc lựa chọn RecurrentPPO (PPO kết hợp LSTM) thay vì các thuật toán RL khác (như DQN) hay mạng MLP thông thường dựa trên các lý do chính sau:
 
 \begin{enumerate}[leftmargin=1.5em, itemsep=0.3ex]
-    \item \textbf{Khắc phục bùng nổ tổ hợp không gian hành động (Multi-Discrete Factorization):} Trong bài toán điều phối định tuyến đa luồng đồng thời, nếu mô hình hóa hành động dạng rời rạc nguyên khối (Flat Discrete Action) như DQN, không gian hành động sẽ bùng nổ theo hàm mũ $K^{|\mathcal{M}|}$. Với $K = 3$ và $|\mathcal{M}| = 20$ (NSFNET), số hành động khả dĩ là $3^{20} \approx 3.48 \times 10^9$; với $|\mathcal{M}| = 30$ (GÉANT), số hành động lên tới $3^{30} \approx 2.05 \times 10^{14}$. DQN hay bất kỳ thuật toán giá trị Q nào hoàn toàn bất khả thi trong không gian này. Ngược lại, thuật toán PPO hỗ trợ không gian \texttt{MultiDiscrete}, phân rã phân phối chính sách thành tích xác suất biên duyên độc lập:
+    \item Tránh bùng nổ không gian hành động: Với 20--30 luồng lớn và mỗi luồng có 3 lựa chọn đường đi, nếu gộp chung thành một không gian rời rạc đơn lẻ như trong DQN, số hành động kết hợp sẽ lên tới $3^{20} \approx 3.48 \times 10^9$ (NSFNET) hoặc $3^{30} \approx 2.05 \times 10^{14}$ (GÉANT). Không gian này quá lớn để DQN có thể học được. PPO hỗ trợ không gian \texttt{MultiDiscrete}, cho phép tác tử chọn đường cho từng luồng một cách độc lập:
     \begin{equation}
         \pi_\theta(\mathbf{a}_t \mid \mathbf{s}_t) = \prod_{k \in \mathcal{M}} \pi_{\theta_k}(a_t[k] \mid \mathbf{s}_t)
     \end{equation}
-    Nhờ cấu trúc này, số lượng nút đầu ra của mạng Actor chỉ tăng tuyến tính theo $O(K \cdot |\mathcal{M}|)$ (chỉ $3 \times 20 = 60$ logits cho NSFNET và 90 logits cho GÉANT), biến bài toán tối ưu từ phi thực tế thành khả thi cao.
+    Nhờ đó, mạng chính sách chỉ cần xuất ra $3 \times 20 = 60$ giá trị đầu ra (tăng tuyến tính theo số luồng), giúp mô hình học nhanh và ổn định hơn rất nhiều.
     
-    \item \textbf{Cơ chế cắt tỉa hàm mục tiêu (Clipped Surrogate Objective) chống sụp đổ chính sách:} Động thái lưu lượng mạng viễn thông có tính biến thiên rất cao và các hàm phạt độ trễ/mất gói phi tuyến tính dốc đứng. Trong các thuật toán Policy Gradient truyền thống (hoặc TRPO), một bước nhảy gradient quá đà khi gặp đột biến tải có thể làm suy giảm nghiêm trọng độ ổn định của chính sách (Policy Collapse). PPO kiểm soát độ lệch chính sách thông qua hàm mục tiêu cắt tỉa:
+    \item Cập nhật chính sách an toàn với cơ chế PPO Clip: Lưu lượng mạng viễn thông biến động rất nhanh và độ trễ tăng vọt khi nghẽn. Các thuật toán Policy Gradient thông thường rất dễ bị hỏng chính sách nếu cập nhật bước nhảy quá lớn khi gặp đột biến tải. PPO giải quyết vấn đề này bằng hàm mục tiêu cắt tỉa:
     \begin{equation}
         \mathcal{L}^{\text{CLIP}}(\theta) = \hat{\mathbb{E}}_t \left[ \min\left( r_t(\theta)\hat{A}_t, \, \text{clip}(r_t(\theta), 1-\epsilon_{\text{clip}}, 1+\epsilon_{\text{clip}})\hat{A}_t \right) \right]
     \end{equation}
-    với $r_t(\theta) = \frac{\pi_\theta(\mathbf{a}_t|\mathbf{s}_t)}{\pi_{\theta_{\text{old}}}(\mathbf{a}_t|\mathbf{s}_t)}$ và $\epsilon_{\text{clip}} = 0.2$. Cơ chế này thiết lập một vùng tin cậy (Trust Region), ngăn chặn các cập nhật phá hủy khi lưu lượng dao động thất thường, bảo đảm quá trình hội tụ đơn điệu cải thiện.
+    với $\epsilon_{\text{clip}} = 0.2$. Cơ chế này giới hạn mức thay đổi chính sách ở mỗi bước cập nhật, giúp quá trình học diễn ra êm và không bị sụp đổ khi gặp biến động bất thường.
     
-    \item \textbf{Giải quyết bài toán quan sát từng phần (POMDP) qua tầng nhớ LSTM:} Trạng thái tức thời $\mathbf{s}_t$ tại bước thời gian hiện tại chỉ là một lát cắt tĩnh, không phản ánh được vector động lượng lưu lượng (Traffic Momentum -- tức đạo hàm bậc nhất thể hiện tải đang tăng nhanh, đạt đỉnh hay suy giảm). Việc tích hợp tầng nhớ LSTM kích thước 128 đơn vị với trạng thái ẩn $\mathbf{h}_t = \text{LSTM}(\mathbf{h}_{t-1}, \mathbf{s}_t)$ giúp tác tử lưu giữ ngữ cảnh lịch sử qua nhiều chu kỳ bước thời gian, giải quyết triệt để tính chất POMDP của mạng truyền thông.
+    \item Tầng nhớ LSTM giúp nhận biết xu hướng lưu lượng: Một trạng thái $\mathbf{s}_t$ tại thời điểm hiện tại chỉ là ảnh chụp tĩnh, không cho biết tải đang tăng, đang giảm hay đi ngang. Tầng nhớ LSTM (128 đơn vị) lưu lại ngữ cảnh chuỗi thời gian của các bước trước đó, giúp tác tử nắm bắt được xu hướng biến thiên của lưu lượng mạng.
     
-    \item \textbf{Thiết lập quán tính hành động (Action Inertia) và triệt tiêu rung giật tuyến (Route Flapping):} Đối với các mạng truyền thẳng thông thường (MLP thuần), khi tải liên kết dao động mấp mé ngưỡng né nghẽn ($u \approx 0.65$), tác tử rất dễ bị rơi vào trạng thái nhảy tuyến liên tục qua lại giữa hai bước (hiện tượng Ping-Pong / Route Flapping). Việc đổi tuyến liên tục này làm xáo trộn thứ tự gói tin TCP (Packet Reordering), gây kích hoạt giả cơ chế Fast Retransmit và làm suy giảm nghiêm trọng thông lượng mạng. Nhờ bộ nhớ trạng thái ẩn $\mathbf{h}_t$, mạng LSTM hình thành cơ chế trễ tâm lý (Hysteresis) và quán tính hành động (Action Inertia): tác tử duy trì tuyến ổn định khi dao động tải chỉ mang tính ngẫu nhiên ngắn hạn (giữ tỷ lệ nhảy tuyến Churn dưới $0.1\%$), nhưng sẵn sàng phản ứng dứt khoát chuyển hướng khi lưu lượng dâng cao bền vững hoặc xảy ra đứt liên kết.
+    \item Tránh rung giật tuyến (Route Flapping): Mạng truyền thẳng (MLP) thông thường rất dễ bị hiện tượng đổi đường liên tục ở mỗi bước thời gian khi tải dao động quanh ngưỡng $0.65$. Hiện tượng nhảy tuyến này làm đảo lộn thứ tự gói tin TCP và làm giảm thông lượng mạng. Nhờ bộ nhớ trạng thái ẩn, LSTM tạo ra quán tính hành động (Action Inertia): tác tử sẽ giữ nguyên tuyến đường ổn định khi tải chỉ dao động nhẹ (tỷ lệ đổi tuyến $\text{Churn} < 0.1\%$), và chỉ chuyển hướng khi tải tăng cao rõ rệt hoặc khi có sự cố đứt đường truyền.
 \end{enumerate}
 
 \begin{figure}[H]
@@ -257,117 +257,136 @@ Max Gradient Norm & $g_{\text{max}}$ & 0.5 & Ngưỡng cắt chuẩn gradient ch
 \end{tabularx}
 \end{table}
 
-\subsection{Xây dựng hàm đánh giá môi trường và chứng minh hàm phần thưởng}
-Đã xây dựng và chuẩn hóa toàn bộ logic của hàm \texttt{step()} để mô phỏng trạng thái mạng sau mỗi quyết định định tuyến: ánh xạ hành động sang bảng tuyến, cộng dồn lưu lượng lên từng liên kết, tính mức sử dụng liên kết cực đại (MLU), tính toán độ trễ lan truyền, độ trễ hàng đợi và tỷ lệ mất gói theo mô hình M/M/1, đồng thời cập nhật tỷ lệ nhảy tuyến (Route Churn) và tính phần thưởng.
+\subsection{Xây dựng hàm đánh giá môi trường và phân tích hàm phần thưởng}
+Hàm \texttt{step()} trong môi trường Gymnasium mô phỏng phản ứng của mạng sau mỗi quyết định định tuyến: gán đường đi cho các luồng, cộng dồn lưu lượng lên từng liên kết, tính mức tải cực đại (MLU), tính độ trễ lan truyền và độ trễ hàng đợi theo mô hình M/M/1, kiểm tra tỷ lệ mất gói và tính điểm phần thưởng.
 
-Quy trình thực thi logic chuyển trạng thái của môi trường Gymnasium được chuẩn hóa tường minh tại Thuật toán \ref{alg:gym_step}:
+Quy trình thực thi logic chuyển trạng thái của môi trường được mô tả tại Thuật toán \ref{alg:gym_step}:
 
 \begin{algorithm}[H]
-\caption{Gymnasium Routing Environment Step Logic}
+\caption{Quy trình một bước chuyển trạng thái (Gym Environment Step)}
 \label{alg:gym_step}
 \begin{algorithmic}[1]
-\Require Action vector $\mathbf{a}_t \in \{0, 1, 2\}^{|\mathcal{M}|}$, current traffic demand matrix $\mathbf{TM}_t$.
-\Ensure Next state $\mathbf{s}_{t+1}$, reward $R_t$, termination flag $done$, diagnostics $info$.
-\State \textbf{1. Candidate Path Selection:}
-\State \quad $p_k \gets \text{KSP}(k)[\mathbf{a}_t[k]], \quad \forall k \in \mathcal{M}$
-\State \textbf{2. Background Traffic Routing:}
-\State \quad $p_f \gets \text{OSPF}(f), \quad \forall f \notin \mathcal{M}$
-\State \textbf{3. Link Traffic Aggregation:}
-\State \quad $\text{Demand}(e) \gets \sum_{(u, v): e \in P_{(u,v)}} \mathbf{TM}_t[u, v], \quad \forall e \in \mathcal{E}$
-\State \textbf{4. Link Utilization Computation:}
-\State \quad $u(e) \gets \frac{\text{Demand}(e)}{\text{Capacity}(e)}, \quad \text{MLU}_t \gets \max_{e \in \mathcal{E}} u(e)$
-\State \textbf{5. Propagation \& M/M/1 Queuing Delay Calculation:}
-\State \quad $D(e) \gets d_{\text{prop}}(e) + \frac{1}{\mu(e) - \lambda(e)}, \quad \bar{D}_t \gets \frac{1}{|\mathcal{E}|} \sum_{e \in \mathcal{E}} D(e)$
-\State \textbf{6. Link Packet Loss Probability Evaluation ($u(e) > 0.90$):}
-\State \quad $L(e) \gets \left[\max\left(0, \frac{u(e) - 0.90}{1.0 - 0.90}\right)\right]^2, \quad \bar{L}_t \gets \frac{1}{|\mathcal{E}|} \sum_{e \in \mathcal{E}} L(e)$
-\State \textbf{7. Route Flapping (Churn) Measurement:}
-\State \quad $\text{Churn}_t \gets \frac{1}{|\mathcal{M}|} \sum_{k \in \mathcal{M}} \mathbb{I}(\mathbf{a}_t[k] \neq \mathbf{a}_{t-1}[k])$
-\State \textbf{8. Adaptive Delay Penalty Weight Adaptation:}
-\State \quad $w_{\text{delay}}(t) \gets \begin{cases} 0.8 & \text{if } \text{MLU}_t < 0.65 \\ 0.3 & \text{otherwise} \end{cases}$
-\State \textbf{9. Multi-Objective Scalar Reward Calculation:}
-\State \quad $R_t \gets -\left( 1.0 \cdot \text{MLU}_t + 0.5 \cdot \bar{D}_t^{\text{norm}} + w_{\text{delay}}(t) \cdot D_t^{\text{excess}} + 3.0 \cdot \bar{L}_t + 0.08 \cdot \text{Churn}_t \right)$
-\State \textbf{10. Traffic Prediction Integration \& Observation Assembly:}
-\State \quad $\mathbf{\hat{u}}_{t+1} \gets \text{FedTrafficLSTM}(\mathbf{X}_{t-11:t}), \quad \mathbf{s}_{t+1} \gets [\mathbf{u}_t \parallel \mathbf{\hat{u}}_{t+1} \parallel \mathbf{d}_t]$
-\State \Return Next observation $\mathbf{s}_{t+1}$, reward $R_t$, termination flag $done$, diagnostics $info$.
+\Require Vector hành động $\text{actions}$, ma trận lưu lượng $\text{traffic\_matrix}$.
+\Ensure Trạng thái mới $s_{t+1}$, phần thưởng $R_t$, cờ kết thúc $done$, thông tin chẩn đoán $info$.
+
+\State 1. Chọn đường đi cho các luồng lớn từ tập K đường ngắn nhất:
+\State \quad \texttt{for flow in managed\_flows:}
+\State \quad \quad \texttt{path[flow] = K\_shortest\_paths[flow][actions[flow]]}
+
+\State 2. Định tuyến các luồng nhỏ còn lại qua đường ngắn nhất OSPF:
+\State \quad \texttt{for flow in background\_flows:}
+\State \quad \quad \texttt{path[flow] = ospf\_shortest\_path(flow)}
+
+\State 3. Cộng dồn lưu lượng lên từng liên kết mạng:
+\State \quad \texttt{for link in links:}
+\State \quad \quad \texttt{link\_load[link] = sum(flow.demand for flow in flows\_using\_link)}
+
+\State 4. Tính mức sử dụng liên kết và tải cực đại toàn mạng (MLU):
+\State \quad \texttt{for link in links:}
+\State \quad \quad \texttt{util[link] = link\_load[link] / link\_capacity[link]}
+\State \quad \texttt{MLU = max(util.values())}
+
+\State 5. Tính độ trễ lan truyền và trễ hàng đợi M/M/1:
+\State \quad \texttt{for link in links:}
+\State \quad \quad \texttt{delay[link] = prop\_delay[link] + mm1\_queue\_delay(util[link])}
+
+\State 6. Đánh giá tỷ lệ mất gói khi tải vượt ngưỡng 90\%:
+\State \quad \texttt{for link in links:}
+\State \quad \quad \texttt{loss[link] = ((util[link] - 0.9) / 0.1)**2 if util[link] > 0.9 else 0.0}
+
+\State 7. Đo đạc tỷ lệ nhảy tuyến (Route Churn) so với bước trước:
+\State \quad \texttt{flapped = count(actions[flow] != prev\_actions[flow])}
+\State \quad \texttt{churn = flapped / total\_managed\_flows}
+
+\State 8. Điều chỉnh trọng số phạt trễ theo mức tải mạng:
+\State \quad \texttt{w\_delay = 0.8 if MLU < 0.65 else 0.3}
+
+\State 9. Tính điểm phần thưởng tổng hợp:
+\State \quad \texttt{penalty = 1.0 * MLU + 0.5 * norm\_delay + w\_delay * excess\_delay}
+\State \quad \texttt{reward = -(penalty + 3.0 * loss + 0.08 * churn)}
+
+\State 10. Lấy dự báo tải từ mô hình FL và ghép vector trạng thái mới:
+\State \quad \texttt{predicted\_load = federated\_lstm.predict(recent\_load\_history)}
+\State \quad \texttt{next\_state = concatenate([current\_util, predicted\_load, current\_demands])}
+
+\State \Return \texttt{next\_state, reward, done, info}
 \end{algorithmic}
 \end{algorithm}
 
-Hàm phần thưởng (Reward) được thiết kế đa mục tiêu nhằm tối ưu đồng thời các chỉ số SLA:
+Hàm phần thưởng được thiết kế nhằm cân bằng giữa việc giảm nghẽn mạng và duy trì độ trễ thấp:
 \begin{equation}
 \label{eq:reward}
     R_t = -\left( 1.0 \cdot \text{MLU}_t + 0.5 \cdot \bar{D}_t^{\text{norm}} + w_{\text{delay}}(t) \cdot D_t^{\text{excess}} + 3.0 \cdot \bar{L}_t + 0.08 \cdot \text{Churn}_t \right)
 \end{equation}
 
-Căn cứ định lượng lựa chọn các thành phần và trọng số trong hàm phần thưởng:
+Ý nghĩa và cơ sở lựa chọn các trọng số trong hàm phần thưởng:
 \begin{itemize}[leftmargin=1.5em, itemsep=0.15ex]
-    \item \textbf{Trễ chuẩn hóa ($0.5 \cdot \bar{D}_t^{\text{norm}}$):} $\bar{D}_t^{\text{norm}} = \min(\bar{D}_t / D_{\max}, 1.0)$ quy đổi độ trễ trung bình $\bar{D}_t$ (ms) về miền $[0, 1]$ cùng thang đo với MLU, bảo đảm ổn định gradient tối ưu cho PPO và duy trì áp lực giảm trễ nền tảng.
-    \item \textbf{Trễ dôi dư đường vòng ($D_t^{\text{excess}}$):} $D_t^{\text{excess}} = \max(0, \bar{D}_t - D_{\text{base}}) / D_{\text{base}}$ định lượng tỷ lệ trễ phát sinh khi tác tử chọn đường rẽ phụ so với tuyến ngắn nhất lý thuyết OSPF ($D_{\text{base}}$).
-    \item \textbf{Trọng số phạt trễ thích ứng ($w_{\text{delay}} = 0.8$ khi $\text{MLU} < 0.65$):} Phạt nặng trễ dôi dư $D_t^{\text{excess}}$ nhằm ép toàn bộ luồng chạy trên đường ngắn nhất OSPF; nếu chọn thấp hơn, tác tử sẽ tùy tiện rẽ luồng gây tăng trễ vô ích, còn nếu chọn cao hơn tác tử trở nên quá cứng nhắc và chậm thích nghi khi lưu lượng bắt đầu dâng cao.
-    \item \textbf{Trọng số phạt trễ thích ứng ($w_{\text{delay}} = 0.3$ khi $\text{MLU} \ge 0.65$):} Giảm xuống 0.3 nhằm nới lỏng phạt $D_t^{\text{excess}}$, cho phép tác tử rẽ luồng sang tuyến phụ để cứu gói tin; nếu chọn thấp hơn, tác tử sẽ chọn những tuyến phụ quá dài làm bùng nổ độ trễ toàn mạng, còn nếu chọn cao hơn, tác tử sẽ sợ bị phạt trễ mà không dám chuyển luồng, khiến nghẽn mạng trầm trọng hơn.
-    \item \textbf{Trọng số phạt mất gói ($3.0 \cdot \bar{L}_t$):} Đặt ở mức 3.0 vì nếu chọn thấp hơn, tác tử sẽ xem nhẹ việc mất gói và sẵn sàng đánh đổi làm rớt gói để duy trì độ trễ thấp; ngược lại nếu chọn quá cao, các đỉnh mất gói đột biến sẽ tạo ra gradient quá lớn làm mất ổn định quá trình tối ưu và gây sụp đổ chính sách.
-    \item \textbf{Trọng số phạt nhảy tuyến ($0.08 \cdot \text{Churn}_t$):} Đặt ở mức 0.08 để cân bằng độ ổn định định tuyến; nếu chọn thấp hơn, tác tử sẽ đổi tuyến liên tục giữa các bước thời gian gây xáo trộn thứ tự gói tin (packet reordering), còn nếu chọn cao hơn tác tử sẽ rơi vào trạng thái trơ và từ chối đổi tuyến ngay cả khi liên kết chính đang bị nghẽn nặng.
+    \item Trễ chuẩn hóa ($0.5 \cdot \bar{D}_t^{\text{norm}}$): Đưa độ trễ trung bình $\bar{D}_t$ về miền $[0, 1]$ cùng thang đo với MLU để giữ độ ổn định gradient và duy trì áp lực giảm trễ.
+    \item Trễ đường vòng ($D_t^{\text{excess}}$): Đo tỷ lệ độ trễ tăng thêm khi chọn đường phụ so với đường ngắn nhất OSPF ($D_{\text{base}}$).
+    \item Phạt trễ khi tải thấp ($w_{\text{delay}} = 0.8$ khi $\text{MLU} < 0.65$): Phạt nặng việc đi đường vòng để ép các luồng chạy trên đường ngắn nhất OSPF khi mạng đang thông thoáng.
+    \item Phạt trễ khi tải cao ($w_{\text{delay}} = 0.3$ khi $\text{MLU} \ge 0.65$): Giảm phạt đường vòng để tác tử được phép rẽ luồng sang đường phụ nhằm giảm tải và tránh nghẽn.
+    \item Phạt mất gói ($3.0 \cdot \bar{L}_t$): Trọng số phạt cao để ngăn chặn việc đánh đổi làm rơi gói tin lấy độ trễ thấp.
+    \item Phạt nhảy tuyến ($0.08 \cdot \text{Churn}_t$): Hạn chế việc đổi tuyến liên tục giữa các bước, giúp luồng truyền TCP ổn định hơn.
 \end{itemize}
 
 \begin{figure}[H]
     \centering
     \includegraphics[width=0.96\textwidth]{figures/fig_reward_proof.pdf}
-    \caption{\textit{Chứng minh toán học và phân tích đồ thị hàm phần thưởng định tuyến đa mục tiêu: (a) Phân rã độ lớn các thành phần phạt theo mức tải liên kết $u$; (b) Phân vùng 3 chế độ vận hành SLA (Safe Zone, Proactive Detour Zone, Emergency Evacuation Zone).}}
+    \caption{\textit{Phân tích đồ thị hàm phần thưởng: (a) Mức phạt của từng thành phần theo mức tải liên kết $u$; (b) Phân vùng 3 trạng thái hoạt động (Safe Zone, Proactive Detour Zone, Emergency Evacuation Zone).}}
     \label{fig:reward_proof}
 \end{figure}
 
-\subsubsection*{Chứng minh toán học: 3 Chế độ vận hành SLA của Hàm phần thưởng}
-Đồ thị Hình \ref{fig:reward_proof} chứng minh cách hàm phần thưởng $R_t$ tự động phân hóa không gian hành vi của tác tử thành 3 chế độ vận hành riêng biệt dựa trên mức tải liên kết $u$:
+\subsubsection*{Phân tích 3 vùng vận hành của hàm phần thưởng}
+Đồ thị Hình \ref{fig:reward_proof} minh họa cách hàm phần thưởng tự động phân hóa hành vi định tuyến thành 3 vùng theo mức tải liên kết $u$:
 
 \begin{enumerate}[leftmargin=1.5em, itemsep=0.3ex]
-    \item \textbf{Chế độ 1: Vùng An toàn (Safe Zone, $u < 0.65$):} Khi mạng hoạt động ở mức tải thấp và trung bình, độ trễ hàng đợi viễn thông theo lý thuyết M/M/1 xấp xỉ 0 ($D_{\text{queue}} \approx 0$), không xảy ra mất gói ($L(e) = 0$). Lúc này, việc chuyển luồng sang tuyến phụ KSP chỉ làm tăng trễ lan truyền vật lý không cần thiết. Vì $w_{\text{delay}} = 0.8 \gg 0.08$ (phạt churn), hàm phạt trễ dôi dư áp đảo hoàn toàn, tạo áp lực toán học ép chặt chính sách lựa chọn đường đi ngắn nhất tuyệt đối OSPF ($D_t^{\text{excess}} = 0$).
+    \item Vùng an toàn ($u < 0.65$): Khi tải mạng thấp, hàng đợi M/M/1 xấp xỉ 0 và không có mất gói. Lúc này, đi đường vòng chỉ làm tăng trễ lan truyền. Do trọng số phạt trễ đường vòng ở mức cao ($w_{\text{delay}} = 0.8$), mô hình sẽ luôn giữ luồng trên đường ngắn nhất OSPF.
     
-    \item \textbf{Chế độ 2: Vùng Rẽ nhánh Chủ động (Proactive Detour Zone, $0.65 \le u \le 0.90$):} Khi lưu lượng tăng cao và chạm ngưỡng $0.65$, độ trễ hàng đợi M/M/1 bắt đầu tăng trưởng phi tuyến tính. Hệ thống tự động giảm trọng số phạt trễ dôi dư $w_{\text{delay}}$ từ $0.8$ xuống $0.3$. Lúc này, chi phí phạt do tải cao ($1.0 \times \text{MLU}_t$) vượt trội so với mức phạt trễ dôi dư nới lỏng ($0.3 \times D_t^{\text{excess}}$). Tác tử được ủy quyền hợp lệ để rẽ nhánh các luồng voi sang tuyến phụ KSP $k=1, 2$, chủ động san tải toàn mạng và ngăn ngừa triệt để nguy cơ tràn bộ đệm trước khi xảy ra mất gói.
+    \item Vùng rẽ nhánh chủ động ($0.65 \le u \le 0.90$): Khi tải vượt 0.65, trễ hàng đợi bắt đầu tăng nhanh. Hệ thống tự động giảm phạt trễ đường vòng xuống $w_{\text{delay}} = 0.3$. Lúc này, chi phí phạt tải cao ($1.0 \times \text{MLU}$) lớn hơn chi phí đi đường vòng ($0.3 \times D^{\text{excess}}$), thúc đẩy tác tử chủ động chuyển bớt luồng lớn sang đường phụ để san tải và tránh nghẽn trước khi bộ đệm bị tràn.
     
-    \item \textbf{Chế độ 3: Vùng Di tản Khẩn cấp (Emergency Evacuation Zone, $u > 0.90$):} Khi tải vượt quá ngưỡng bão hòa $0.90$, hàm mất gói bậc hai $L(e) = [ (u - 0.90)/0.10 ]^2$ được kích hoạt. Thành phần phạt mất gói với trọng số cực lớn $3.0 \cdot \bar{L}_t$ tăng vọt và chiếm ưu thế áp đảo toàn bộ các thành phần còn lại trong hàm phần thưởng (Hình \ref{fig:reward_proof}a). Đạo hàm phạt dốc đứng này ép tác tử phải lập tức di tản lưu lượng ra khỏi liên kết đang gặp sự cố hoặc quá tải bằng mọi giá, chấp nhận chi phí trễ dôi dư cao hơn hoặc chi phí nhảy tuyến tạm thời để bảo vệ chỉ tiêu SLA cốt lõi là không làm rớt gói tin.
+    \item Vùng di tản khẩn cấp ($u > 0.90$): Khi tải vượt ngưỡng 0.90, hàng đợi bị tràn và gói tin bắt đầu rơi. Thành phần phạt mất gói với trọng số 3.0 tăng vọt và chiếm ưu thế áp đảo toàn bộ các thành phần khác (Hình \ref{fig:reward_proof}a). Tác tử buộc phải chuyển luồng ra khỏi liên kết nghẽn ngay lập tức để cứu gói tin, chấp nhận đi đường vòng xa hơn hoặc đổi tuyến tạm thời.
 \end{enumerate}
 
-\subsection{Xây dựng pipeline thực nghiệm và đặc tả chi tiết các kịch bản đánh giá}
-Đã xây dựng pipeline hoàn chỉnh gồm các pha khép kín: sinh dữ liệu ma trận lưu lượng $\to$ tiền xử lý $\to$ huấn luyện FL $\to$ điều phối DRL $\to$ đánh giá đa kịch bản. Các script thực thi chính gồm \texttt{run\_full\_pipeline.py} và \texttt{demo.py}; mô hình huấn luyện được lưu trữ tập trung tại thư mục \texttt{models/}.
+\subsection{Đặc tả chi tiết các kịch bản đánh giá}
+Hệ thống sử dụng bộ 6 kịch bản thực nghiệm trên chu kỳ 100 bước ($\Delta t = 15$ phút/bước, tương đương 25 giờ). Gọi $\mathbf{TM}_t(u, v)$ là nhu cầu lưu lượng giữa cặp nút $(u, v)$ tại bước $t$, và $\mathbf{TM}^{\text{base}}(u, v)$ là ma trận lưu lượng danh định cơ sở:
 
-Bộ 6 kịch bản thực nghiệm được chuẩn hóa trên chu kỳ đánh giá $N_{\text{steps}} = 100$ bước ($\Delta t = 15$ phút/bước, tương đương 25 giờ liên tục). Gọi $\mathbf{TM}_t(u, v)$ là nhu cầu lưu lượng tức thời giữa cặp nút $(u, v)$ tại bước $t$, và $\mathbf{TM}^{\text{base}}(u, v)$ là ma trận lưu lượng danh định cơ sở:
-
-\begin{itemize}[leftmargin=1.5em, itemsep=0.4ex]
-    \item \textbf{Kịch bản T1 -- Chu kỳ tải ngày/đêm tự nhiên (Normal Diurnal Cycle):}
+\begin{itemize}[leftmargin=1.5em, itemsep=0.3ex]
+    \item T1 (Chu kỳ ngày/đêm): Lưu lượng biến thiên hình sin theo chu kỳ 24 giờ tự nhiên:
     \begin{equation}
         \mathbf{TM}_t(u, v) = \mathbf{TM}^{\text{base}}(u, v) \cdot \left[ 1 + 0.30 \cdot \sin\left(\frac{2\pi t}{96} - \frac{\pi}{2}\right) \right] + \boldsymbol{\epsilon}_t, \quad \boldsymbol{\epsilon}_t \sim \mathcal{N}(0, 0.02)
     \end{equation}
-    \textit{Mục tiêu kiểm thử SLA:} Khảo sát hiệu năng khi toàn mạng vận hành trong vùng tải an toàn ($\text{MLU} < 0.65$). Đánh giá khả năng tối ưu trễ lan truyền, kiểm chứng tác tử tôn trọng đường ngắn nhất OSPF và không tự tiện rẽ luồng gây tăng trễ vô ích khi không có nguy cơ tắc nghẽn.
+    Mục tiêu: Đánh giá khả năng tối ưu trễ khi mạng chạy ở tải bình thường ($\text{MLU} < 0.65$), kiểm tra xem tác tử có giữ luồng trên đường ngắn nhất OSPF hay không.
 
-    \item \textbf{Kịch bản T2 -- Đột biến lưu lượng cục bộ (Traffic Spike):}
+    \item T2 (Đột biến lưu lượng cục bộ): Tăng đột biến gấp 3 lần trên 3 luồng lớn nhất trong khung giờ cao điểm ($t \in [30, 40]$):
     \begin{equation}
-        \mathbf{TM}_t(u, v) = \mathbf{TM}_t^{\text{base}}(u, v) \cdot \left( 1 + \alpha_k \cdot \mathbb{I}(t \in [30, 40]) \right), \quad \alpha_k = 3.0, \; \forall (u, v) \in \mathcal{M}_{\text{top3}}
+        \mathbf{TM}_t(u, v) = \mathbf{TM}_t^{\text{base}}(u, v) \cdot \left( 1 + 3.0 \cdot \mathbb{I}(t \in [30, 40]) \right), \quad \forall (u, v) \in \mathcal{M}_{\text{top3}}
     \end{equation}
-    \textit{Mục tiêu kiểm thử SLA:} Đột biến tải gấp $3\times$ trên top-3 luồng voi lớn nhất tại khung giờ cao điểm ($t \in [30, 40]$). Kiểm tra năng lực phản xạ sớm (Proactive Reaction): nhờ vector dự báo tải $\mathbf{\hat{u}}_{t+1}$ từ FL-LSTM cảnh báo trước xu hướng tăng tải, tác tử chủ động phân luồng sang tuyến phụ trước khi hàng đợi gói tin bị phình to.
+    Mục tiêu: Kiểm tra xem tác tử có tận dụng dự báo tải $\mathbf{\hat{u}}_{t+1}$ từ FL để rẽ nhánh sớm trước khi hàng đợi bị đầy hay không.
 
-    \item \textbf{Kịch bản T3 -- Quá tải lũy tiến toàn mạng (Gradual Network Escalation):}
+    \item T3 (Quá tải lũy tiến toàn mạng): Tải toàn mạng tăng dần tuyến tính từ $+0\%$ lên $+50\%$ xuyên suốt 100 bước:
     \begin{equation}
-        \mathbf{TM}_t(u, v) = \mathbf{TM}_t^{\text{base}}(u, v) \cdot \left( 1 + 0.50 \cdot \frac{t}{N_{\text{steps}}} \right), \quad t \in [0, 100]
+        \mathbf{TM}_t(u, v) = \mathbf{TM}_t^{\text{base}}(u, v) \cdot \left( 1 + 0.50 \cdot \frac{t}{100} \right), \quad t \in [0, 100]
     \end{equation}
-    \textit{Mục tiêu kiểm thử SLA:} Tăng tải lũy tiến toàn mạng từ $+0\%$ lên $+50\%$, ép các liên kết trọng yếu chạm ngưỡng bão hòa vật lý. Stress-test khả năng chống chịu quá tải cực đại của toàn mạng, kiểm chứng năng lực khai thác dung lượng dự phòng trên các tuyến phụ để triệt tiêu mất gói dây chuyền.
+    Mục tiêu: Kiểm tra khả năng chịu tải cực hạn và san tải sang các đường phụ để chống rớt gói khi toàn mạng quá tải.
 
-    \item \textbf{Kịch bản T4 -- Dồn tải đám đông bất thường (Flash Crowd Congestion):}
+    \item T4 (Dồn tải đám đông bất thường): Tăng tải gấp 5 lần trên 5 luồng lớn nhất trong khoảng thời gian ngắn ($t \in [50, 55]$):
     \begin{equation}
-        \mathbf{TM}_t(u, v) = \mathbf{TM}_t^{\text{base}}(u, v) \cdot \left( 1 + \beta_k \cdot \mathbb{I}(t \in [50, 55]) \right), \quad \beta_k = 5.0, \; \forall (u, v) \in \mathcal{M}_{\text{top5}}
+        \mathbf{TM}_t(u, v) = \mathbf{TM}_t^{\text{base}}(u, v) \cdot \left( 1 + 5.0 \cdot \mathbb{I}(t \in [50, 55]) \right), \quad \forall (u, v) \in \mathcal{M}_{\text{top5}}
     \end{equation}
-    \textit{Mục tiêu kiểm thử SLA:} Mô phỏng sự kiện đám đông đột biến (Flash Crowd) dồn tải gấp $5\times$ trên top-5 luồng voi trong khoảng thời gian rất ngắn ($t \in [50, 55]$). Đánh giá tính đàn hồi của hệ thống khi nhu cầu lưu lượng vượt ngưỡng thiết kế của cả đường chính lẫn đường rẽ KSP.
+    Mục tiêu: Đánh giá phản xạ của hệ thống khi nhu cầu lưu lượng vượt quá dung lượng của cả đường chính lẫn đường rẽ phụ.
 
-    \item \textbf{Kịch bản T5 -- Đứt liên kết lõi nghiêm trọng và SDN Failover (Critical Link Failure):}
+    \item T5 (Sự cố đứt liên kết lõi): Ngắt liên kết trọng yếu trong khoảng bước $t = 15$ đến $60$, sau đó khôi phục lại:
     \begin{equation}
         \mathcal{E}_t = \mathcal{E} \setminus \{e_{\text{crit}}\}, \quad t \in [15, 60]; \quad \mathcal{E}_t = \mathcal{E}, \quad t > 60
     \end{equation}
-    trong đó $e_{\text{crit}} = (1, 2)$ trên NSFNET và $e_{\text{crit}} = (4, 7)$ trên GÉANT.
-    \textit{Mục tiêu kiểm thử SLA:} Đánh giá độ bền vững và cơ chế phản ứng sự cố khẩn cấp (Fast Failover). Kiểm tra khả năng tác tử tức thời phát hiện đứt cáp và tái định tuyến luồng tránh điểm đen (black-hole), cũng như khả năng tự động hoàn nguyên (Fall-back) về trạng thái tối ưu sau khi liên kết được khôi phục tại $t > 60$.
+    với $e_{\text{crit}} = (1, 2)$ trên NSFNET và $(4, 7)$ trên GÉANT.
+    Mục tiêu: Đánh giá khả năng chuyển tuyến khẩn cấp để tránh mất gói và khả năng tự động đưa luồng trở lại đường tối ưu sau khi liên kết phục hồi.
 
-    \item \textbf{Kịch bản T6 -- Một ngày bất thường đa pha phi dừng (Irregular Day / Multi-Phase Dynamic):}
+    \item T6 (Ngày bất thường đa pha): Thay đổi mức tải đột ngột qua 3 pha trong ngày:
     \begin{equation}
-        \mathbf{TM}_t(u, v) = \mathbf{TM}_t^{\text{base}}(u, v) \times \begin{cases} 2.0 & \text{với } t \in [0, 30] \quad \text{(Sáng dồn tải nặng -- Morning Surge)} \\ 1.0 & \text{với } t \in (30, 65] \quad \text{(Trưa danh định -- Nominal Midday)} \\ 0.3 & \text{với } t \in (65, 100] \quad \text{(Chiều tối thấp tải -- Off-Peak Slack)} \end{cases}
+        \mathbf{TM}_t(u, v) = \mathbf{TM}_t^{\text{base}}(u, v) \times \begin{cases} 2.0 & t \in [0, 30] \quad \text{(buổi sáng dồn tải nặng)} \\ 1.0 & t \in (30, 65] \quad \text{(buổi trưa bình thường)} \\ 0.3 & t \in (65, 100] \quad \text{(buổi tối tải thấp)} \end{cases}
     \end{equation}
-    \textit{Mục tiêu kiểm thử SLA:} Khảo sát tính đa ứng và khả năng tự động thích nghi với sự thay đổi đột ngột giữa các pha lưu lượng phân phối phi dừng (Non-Stationary Traffic Distribution). Kiểm tra tác tử có tự động rẽ nhánh bảo vệ mạng khi dồn tải ($2.0\times$) và nhanh chóng thu hồi về đường ngắn nhất OSPF khi tải giảm sâu ($0.3\times$) hay không.
+    Mục tiêu: Kiểm tra tính thích ứng của mô hình khi phân phối lưu lượng thay đổi liên tục giữa tải rất nặng và tải rất thấp.
 \end{itemize}
 
 Ngoài ra, hệ thống đã hiện thực hóa cơ chế chuyển giao không mẫu (Zero-Shot Cross-Topology Transfer) từ GÉANT sang Abilene: sử dụng kỹ thuật Zero-Padding căn chỉnh không gian quan sát kết hợp bộ lọc an toàn Projected Load Verification \& Hold-Down Damping ($T_{\text{hold}} \ge 15$ bước), ngăn chặn triệt để dao động tuyến ping-pong khi chuyển giao ($\text{Churn} \le 0.07\%$).
